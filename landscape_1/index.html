@@ -63,16 +63,86 @@
       color: var(--ink);
       font: inherit;
     }
+    .toolbar input[type="range"] {
+      padding: 0;
+      border: none;
+      background: transparent;
+    }
     .toolbar button { cursor: pointer; background: linear-gradient(180deg, #fff, #f1ede5); }
     .status { margin-top: 10px; color: var(--muted); }
     .grid { display: grid; grid-template-columns: 2.2fr 1fr; gap: 16px; margin-top: 16px; }
-    .panel { padding: 16px; }
+    .grid > * { min-width: 0; }
+    .panel { padding: 16px; min-width: 0; }
     .panel h2 { margin: 0 0 10px; font-size: 18px; }
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: end;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .panel-head h2 { margin: 0; }
+    .heatmap-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 320px;
+      max-width: 520px;
+      flex: 1;
+    }
+    .heatmap-controls label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .zoom-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 42px;
+    }
+    .zoom-row button {
+      min-width: 40px;
+      padding-inline: 10px;
+    }
+    .zoom-row input[type="range"] {
+      flex: 1;
+      min-width: 120px;
+    }
+    .zoom-label {
+      min-width: 58px;
+      text-align: right;
+      color: var(--muted);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
     .meta { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
     .meta .card { background: #faf6ee; border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
     .meta .k { color: var(--muted); font-size: 12px; }
     .meta .v { font-size: 18px; font-weight: 600; }
     canvas { width: 100%; display: block; border: 1px solid var(--line); border-radius: 12px; background: white; }
+    .heatmap-wrap {
+      overflow: auto;
+      height: 760px;
+      width: 100%;
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: white;
+      cursor: grab;
+      user-select: none;
+    }
+    .heatmap-wrap.panning { cursor: grabbing; }
+    .heatmap-wrap.clickable { cursor: pointer; }
+    .heatmap-wrap canvas {
+      width: auto;
+      max-width: none;
+      border: none;
+      border-radius: 0;
+      background: white;
+    }
     .legend { display: flex; gap: 0; margin-top: 10px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
     .legend div { flex: 1; padding: 7px 0; text-align: center; font-size: 12px; color: #1f2937; }
     .hint, .footer-meta { margin-top: 8px; color: var(--muted); font-size: 12px; }
@@ -93,6 +163,37 @@
       font: 12px/1.45 Consolas, "Courier New", monospace;
       white-space: pre-wrap;
       word-break: break-word;
+    }
+    .heatmap-tooltip {
+      position: fixed;
+      z-index: 50;
+      max-width: 320px;
+      padding: 10px 12px;
+      border: 1px solid rgba(21, 34, 44, 0.12);
+      border-radius: 12px;
+      background: rgba(255, 253, 248, 0.97);
+      box-shadow: 0 14px 35px rgba(21, 34, 44, 0.18);
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.4;
+      pointer-events: none;
+      opacity: 0;
+      transform: translate(10px, 10px);
+      transition: opacity 80ms ease-out;
+    }
+    .heatmap-tooltip.visible { opacity: 1; }
+    .heatmap-tooltip .tt-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .heatmap-tooltip .tt-line {
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .heatmap-tooltip .tt-em {
+      color: var(--ink);
+      font-weight: 600;
     }
     @media (max-width: 1180px) {
       .hero, .grid, .bottom-grid { grid-template-columns: 1fr; display: grid; }
@@ -125,7 +226,7 @@
       </div>
       <div class="group">
         <label>Color percentile</label>
-        <input id="scale-percentile" type="number" min="50" max="100" step="0.1" value="99.0" />
+        <input id="scale-percentile" type="number" min="50" max="100" step="0.1" value="98.0" />
       </div>
       <div class="group">
         <label>&nbsp;</label>
@@ -136,7 +237,19 @@
 
     <div class="grid">
       <div class="panel">
-        <h2>Landscape heatmap</h2>
+        <div class="panel-head">
+          <h2>Landscape heatmap</h2>
+          <div class="heatmap-controls">
+            <label>Heatmap zoom</label>
+            <div class="zoom-row">
+              <button id="zoom-out-btn" type="button">-</button>
+              <input id="zoom-range" type="range" min="1" max="8" step="0.25" value="1" />
+              <button id="zoom-in-btn" type="button">+</button>
+              <button id="zoom-reset-btn" type="button">Reset</button>
+              <span class="zoom-label" id="zoom-label">100%</span>
+            </div>
+          </div>
+        </div>
         <div class="meta">
           <div class="card"><div class="k">Visible cells</div><div class="v" id="meta-visible-cells">0</div></div>
           <div class="card"><div class="k">Intervals</div><div class="v" id="meta-intervals">0</div></div>
@@ -145,7 +258,9 @@
           <div class="card"><div class="k">Interval field</div><div class="v" id="meta-field">interval</div></div>
           <div class="card"><div class="k">Bucket width</div><div class="v" id="meta-days">n/a</div></div>
         </div>
-        <canvas id="heatmap" width="1240" height="700"></canvas>
+        <div class="heatmap-wrap" id="heatmap-wrap">
+          <canvas id="heatmap" width="1240" height="700"></canvas>
+        </div>
         <div class="legend">
           <div style="background: var(--heat-0);">0</div>
           <div style="background: var(--heat-1);">low</div>
@@ -189,20 +304,58 @@
       </div>
     </div>
   </div>
+  <div class="heatmap-tooltip" id="heatmap-tooltip"></div>
 
   <script>
     const CONFIG = {"reportTitle": "Landscape Report: landscape_1", "overviewUrl": "data/overview.json"};
     const TABLE_LIMIT = 1200;
+    const BASE_CANVAS_WIDTH = 1240;
+    const BASE_CANVAS_HEIGHT = 700;
+    const BASE_LEFT = 76;
+    const BASE_TOP = 20;
+    const BASE_RIGHT = 20;
+    const BASE_BOTTOM = 60;
+    const BASE_CHART_WIDTH = BASE_CANVAS_WIDTH - BASE_LEFT - BASE_RIGHT;
+    const BASE_CHART_HEIGHT = BASE_CANVAS_HEIGHT - BASE_TOP - BASE_BOTTOM;
     const state = {
       overview: null,
       visibleCells: [],
       selected: null,
       detailCache: new Map(),
-      scaleMax: 0
+      scaleMax: 0,
+      zoom: 1,
+      isPanning: false,
+      panStartX: 0,
+      panStartY: 0,
+      panScrollLeft: 0,
+      panScrollTop: 0,
+      panMoved: false,
+      suppressNextHeatmapClick: false,
+      visibleCellMap: new Map(),
+      hoveredCellKey: null
     };
 
     function $(id) { return document.getElementById(id); }
     function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+
+    function cellKey(interval, distance) {
+      return `${interval}:${distance}`;
+    }
+
+    function currentHeatmapZoom() {
+      return clamp(parseFloat($('zoom-range').value || '1'), 1, 8);
+    }
+
+    function syncZoomUi() {
+      $('zoom-range').value = String(state.zoom.toFixed(2));
+      $('zoom-label').textContent = `${Math.round(state.zoom * 100)}%`;
+    }
+
+    function setHeatmapZoom(nextZoom) {
+      state.zoom = clamp(Number(nextZoom) || 1, 1, 8);
+      syncZoomUi();
+      renderHeatmap();
+    }
 
     function setStatus(text) { $('status').textContent = text || ''; }
 
@@ -227,7 +380,129 @@
     }
 
     function currentScalePercentile() {
-      return clamp(parseFloat($('scale-percentile').value || '99.0'), 50, 100);
+      return clamp(parseFloat($('scale-percentile').value || '98.0'), 50, 100);
+    }
+
+    function intervalLabel(interval) {
+      let label = `${state.overview.interval_field || 'interval'}=${interval}`;
+      if (state.overview.interval_days > 0) {
+        const startDay = interval * state.overview.interval_days;
+        const endDay = (interval + 1) * state.overview.interval_days - 1;
+        label += ` (days ${startDay}-${endDay})`;
+      }
+      return label;
+    }
+
+    function hideHeatmapTooltip() {
+      const tooltip = $('heatmap-tooltip');
+      tooltip.classList.remove('visible');
+      tooltip.innerHTML = '';
+      $('heatmap-wrap').classList.remove('clickable');
+      state.hoveredCellKey = null;
+    }
+
+    function showHeatmapTooltip(cell, clientX, clientY) {
+      const tooltip = $('heatmap-tooltip');
+      const topClade = cell[3] ? `${cell[3]} (${Number(cell[4] || 0).toFixed(1)}%)` : 'n/a';
+      tooltip.innerHTML = `
+        <div class="tt-title">${intervalLabel(cell[0])}</div>
+        <div class="tt-line">distance: <span class="tt-em">${cell[1]}</span></div>
+        <div class="tt-line">count: <span class="tt-em">${cell[2]}</span></div>
+        <div class="tt-line">dominant clade: <span class="tt-em">${topClade}</span></div>
+        <div class="tt-line">distinct clades: <span class="tt-em">${cell[5] || 0}</span></div>
+        <div class="tt-line">click for full histogram and IDs</div>
+      `;
+      tooltip.classList.add('visible');
+      $('heatmap-wrap').classList.add('clickable');
+
+      const margin = 16;
+      const rect = tooltip.getBoundingClientRect();
+      let left = clientX + 16;
+      let top = clientY + 16;
+      if (left + rect.width > window.innerWidth - margin) left = clientX - rect.width - 16;
+      if (top + rect.height > window.innerHeight - margin) top = clientY - rect.height - 16;
+      tooltip.style.left = `${Math.max(margin, left)}px`;
+      tooltip.style.top = `${Math.max(margin, top)}px`;
+      state.hoveredCellKey = cellKey(cell[0], cell[1]);
+    }
+
+    function beginHeatmapPan(event) {
+      if (event.button !== 0) return;
+      const wrap = $('heatmap-wrap');
+      hideHeatmapTooltip();
+      state.isPanning = true;
+      state.panMoved = false;
+      state.panStartX = event.clientX;
+      state.panStartY = event.clientY;
+      state.panScrollLeft = wrap.scrollLeft;
+      state.panScrollTop = wrap.scrollTop;
+      wrap.classList.add('panning');
+      event.preventDefault();
+    }
+
+    function updateHeatmapPan(event) {
+      if (!state.isPanning) return;
+      const wrap = $('heatmap-wrap');
+      const dx = event.clientX - state.panStartX;
+      const dy = event.clientY - state.panStartY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        state.panMoved = true;
+        state.suppressNextHeatmapClick = true;
+      }
+      wrap.scrollLeft = state.panScrollLeft - dx;
+      wrap.scrollTop = state.panScrollTop - dy;
+      event.preventDefault();
+    }
+
+    function endHeatmapPan() {
+      if (!state.isPanning) return;
+      state.isPanning = false;
+      $('heatmap-wrap').classList.remove('panning');
+    }
+
+    function updateHoveredHeatmapCell(event) {
+      if (state.isPanning || !state.overview) {
+        hideHeatmapTooltip();
+        return;
+      }
+      const canvas = $('heatmap');
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const x = (event.clientX - rect.left) * scaleX;
+      const y = (event.clientY - rect.top) * scaleY;
+      const left = BASE_LEFT;
+      const top = BASE_TOP;
+      const width = Math.round(BASE_CHART_WIDTH * state.zoom);
+      const height = Math.round(BASE_CHART_HEIGHT * state.zoom);
+      if (x < left || x > left + width || y < top || y > top + height) {
+        hideHeatmapTooltip();
+        return;
+      }
+      const intervalCount = Math.max(1, state.overview.interval_count || 1);
+      const distanceCount = Math.max(1, (state.overview.visible_max_distance || 0) + 1);
+      const cellW = width / intervalCount;
+      const cellH = height / distanceCount;
+      const interval = Math.floor((x - left) / cellW);
+      const distance = Math.floor((top + height - y) / cellH);
+      const key = cellKey(interval, distance);
+      const cell = state.visibleCellMap.get(key);
+      if (!cell) {
+        hideHeatmapTooltip();
+        return;
+      }
+      if (state.hoveredCellKey === key) {
+        const tooltip = $('heatmap-tooltip');
+        const rectTooltip = tooltip.getBoundingClientRect();
+        let leftPos = event.clientX + 16;
+        let topPos = event.clientY + 16;
+        if (leftPos + rectTooltip.width > window.innerWidth - 16) leftPos = event.clientX - rectTooltip.width - 16;
+        if (topPos + rectTooltip.height > window.innerHeight - 16) topPos = event.clientY - rectTooltip.height - 16;
+        tooltip.style.left = `${Math.max(16, leftPos)}px`;
+        tooltip.style.top = `${Math.max(16, topPos)}px`;
+        return;
+      }
+      showHeatmapTooltip(cell, event.clientX, event.clientY);
     }
 
     function emptySelectedCell(interval = -1, distance = -1) {
@@ -357,7 +632,7 @@
         if (cell[0] === selected.interval && cell[1] === selected.distance) {
           tr.classList.add('selected');
         }
-        const topCladeText = cell[3] ? `${cell[3]} (${Number(cell[4] || 0).toFixed(1)}%)` : 'n/a';
+      const topCladeText = cell[3] ? `${cell[3]} (${Number(cell[4] || 0).toFixed(1)}%)` : 'n/a';
         tr.innerHTML = `
           <td>${cell[0]}</td>
           <td>${cell[1]}</td>
@@ -374,6 +649,14 @@
       const overview = state.overview;
       const canvas = $('heatmap');
       const ctx = canvas.getContext('2d');
+      state.visibleCellMap = new Map(state.visibleCells.map((cell) => [cellKey(cell[0], cell[1]), cell]));
+      const zoom = state.zoom || 1;
+      const left = BASE_LEFT;
+      const top = BASE_TOP;
+      const width = Math.round(BASE_CHART_WIDTH * zoom);
+      const height = Math.round(BASE_CHART_HEIGHT * zoom);
+      canvas.width = left + width + BASE_RIGHT;
+      canvas.height = top + height + BASE_BOTTOM;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -388,10 +671,6 @@
 
       const intervalCount = Math.max(1, overview.interval_count || 1);
       const distanceCount = Math.max(1, (overview.visible_max_distance || 0) + 1);
-      const left = 76;
-      const top = 20;
-      const width = canvas.width - left - 20;
-      const height = canvas.height - top - 60;
       const cellW = width / intervalCount;
       const cellH = height / distanceCount;
 
@@ -446,9 +725,13 @@
       ctx.fillText(overview.interval_field || 'interval', left + width / 2 - 24, canvas.height - 4);
 
       $('heatmap-hint').textContent =
-        `Visible cells: ${state.visibleCells.length}. Scale max: ${state.scaleMax.toFixed(2)} (p${currentScalePercentile()}). Click a heatmap cell or a table row to inspect it.`;
+        `Visible cells: ${state.visibleCells.length}. Scale max: ${state.scaleMax.toFixed(2)} (p${currentScalePercentile()}). Zoom: ${Math.round(zoom * 100)}%. Click a heatmap cell or a table row to inspect it.`;
 
       canvas.onclick = (event) => {
+        if (state.suppressNextHeatmapClick) {
+          state.suppressNextHeatmapClick = false;
+          return;
+        }
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
@@ -561,7 +844,7 @@
         }
         state.overview = await response.json();
         $('max-distance').value = '-1';
-        $('scale-percentile').value = '99.0';
+        $('scale-percentile').value = '98.0';
         await refreshView(-1, -1);
       } catch (err) {
         setStatus(String(err));
@@ -584,7 +867,23 @@
       state.selected?.interval ?? -1,
       state.selected?.distance ?? -1
     ));
+    $('zoom-range').addEventListener('input', () => setHeatmapZoom(currentHeatmapZoom()));
+    $('zoom-in-btn').addEventListener('click', () => setHeatmapZoom(state.zoom + 0.25));
+    $('zoom-out-btn').addEventListener('click', () => setHeatmapZoom(state.zoom - 0.25));
+    $('zoom-reset-btn').addEventListener('click', () => setHeatmapZoom(1));
+    $('heatmap-wrap').addEventListener('mousedown', beginHeatmapPan);
+    window.addEventListener('mousemove', updateHeatmapPan);
+    window.addEventListener('mouseup', endHeatmapPan);
+    $('heatmap-wrap').addEventListener('mouseleave', endHeatmapPan);
+    $('heatmap').addEventListener('mousemove', updateHoveredHeatmapCell);
+    $('heatmap').addEventListener('mouseleave', hideHeatmapTooltip);
+    $('heatmap-wrap').addEventListener('wheel', (event) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      setHeatmapZoom(state.zoom + (event.deltaY < 0 ? 0.25 : -0.25));
+    }, { passive: false });
 
+    syncZoomUi();
     loadOverview();
   </script>
 </body>
