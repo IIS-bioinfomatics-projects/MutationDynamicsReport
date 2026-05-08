@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Landscape Report: landscape_14</title>
+  <style>
+    :root {
+      --bg: #f3efe7;
+      --panel: #fffdf8;
+      --ink: #15222c;
+      --muted: #64748b;
+      --line: #d8ddd8;
+      --heat-0: #f8f6ef;
+      --heat-1: #7dd3fc;
+      --heat-2: #38bdf8;
+      --heat-3: #2563eb;
+      --heat-4: #7c3aed;
+      --heat-5: #b91c1c;
+      --accent: #0f766e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #fbf7ef 0%, var(--bg) 55%, #ece4d8 100%);
+      color: var(--ink);
+      font: 14px/1.45 Georgia, "Segoe UI", serif;
+    }
+    .app { padding: 18px; max-width: 1720px; margin: 0 auto; }
+    .hero, .toolbar, .panel {
+      background: color-mix(in srgb, var(--panel) 92%, white 8%);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 14px 35px rgba(21, 34, 44, 0.08);
+    }
+    .hero {
+      padding: 18px 20px;
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: start;
+      margin-bottom: 16px;
+    }
+    .hero h1 { margin: 0 0 8px; font-size: 28px; }
+    .hero p { margin: 0; color: var(--muted); max-width: 920px; }
+    .hero a {
+      text-decoration: none;
+      color: white;
+      background: linear-gradient(180deg, #18837a, #0f766e);
+      border-radius: 12px;
+      padding: 10px 14px;
+      white-space: nowrap;
+      box-shadow: 0 10px 24px rgba(15, 118, 110, 0.25);
+    }
+    .toolbar { padding: 14px 16px; display: flex; gap: 14px; flex-wrap: wrap; align-items: end; }
+    .toolbar .group { display: flex; flex-direction: column; gap: 6px; min-width: 150px; }
+    .toolbar label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .toolbar input, .toolbar button {
+      padding: 9px 11px;
+      border: 1px solid #cfd8d6;
+      border-radius: 10px;
+      background: white;
+      color: var(--ink);
+      font: inherit;
+    }
+    .toolbar button { cursor: pointer; background: linear-gradient(180deg, #fff, #f1ede5); }
+    .status { margin-top: 10px; color: var(--muted); }
+    .grid { display: grid; grid-template-columns: 2.2fr 1fr; gap: 16px; margin-top: 16px; }
+    .panel { padding: 16px; }
+    .panel h2 { margin: 0 0 10px; font-size: 18px; }
+    .meta { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .meta .card { background: #faf6ee; border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+    .meta .k { color: var(--muted); font-size: 12px; }
+    .meta .v { font-size: 18px; font-weight: 600; }
+    canvas { width: 100%; display: block; border: 1px solid var(--line); border-radius: 12px; background: white; }
+    .legend { display: flex; gap: 0; margin-top: 10px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+    .legend div { flex: 1; padding: 7px 0; text-align: center; font-size: 12px; color: #1f2937; }
+    .hint, .footer-meta { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .table-wrap { max-height: 760px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; background: white; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid #ecebe6; text-align: left; white-space: nowrap; }
+    th { position: sticky; top: 0; background: #f7f3eb; z-index: 1; }
+    tr.selected { background: #fff3db; }
+    tr:hover { background: #f8f8f3; cursor: pointer; }
+    .bottom-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px; margin-top: 16px; }
+    .ids-box {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: white;
+      padding: 10px;
+      max-height: 320px;
+      overflow: auto;
+      font: 12px/1.45 Consolas, "Courier New", monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    @media (max-width: 1180px) {
+      .hero, .grid, .bottom-grid { grid-template-columns: 1fr; display: grid; }
+      .meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="hero">
+      <div>
+        <h1>Landscape Report: landscape_14</h1>
+        <p>Landscape view of SARS-CoV-2 sequences: X-axis is time bucket, Y-axis is distance to the reference, and color reflects the number of sequences in each non-empty cell. Click a cell to inspect its clade composition and sequence IDs.</p>
+      </div>
+      <a href="../index.html">Back To Reports</a>
+    </div>
+
+    <div class="toolbar">
+      <div class="group" style="min-width: 320px; flex: 1;">
+        <label>Data source</label>
+        <input id="source-name" type="text" readonly value="" />
+      </div>
+      <div class="group">
+        <label>Min count</label>
+        <input id="min-count" type="number" min="0" step="1" value="1" />
+      </div>
+      <div class="group">
+        <label>Max distance</label>
+        <input id="max-distance" type="number" min="-1" step="1" value="-1" />
+      </div>
+      <div class="group">
+        <label>Color percentile</label>
+        <input id="scale-percentile" type="number" min="50" max="100" step="0.1" value="99.0" />
+      </div>
+      <div class="group">
+        <label>&nbsp;</label>
+        <button id="refresh-btn">Refresh view</button>
+      </div>
+    </div>
+    <div class="status" id="status">Loading overview...</div>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>Landscape heatmap</h2>
+        <div class="meta">
+          <div class="card"><div class="k">Visible cells</div><div class="v" id="meta-visible-cells">0</div></div>
+          <div class="card"><div class="k">Intervals</div><div class="v" id="meta-intervals">0</div></div>
+          <div class="card"><div class="k">Max distance</div><div class="v" id="meta-distance">0</div></div>
+          <div class="card"><div class="k">Total sequences</div><div class="v" id="meta-total-seq">0</div></div>
+          <div class="card"><div class="k">Interval field</div><div class="v" id="meta-field">interval</div></div>
+          <div class="card"><div class="k">Bucket width</div><div class="v" id="meta-days">n/a</div></div>
+        </div>
+        <canvas id="heatmap" width="1240" height="700"></canvas>
+        <div class="legend">
+          <div style="background: var(--heat-0);">0</div>
+          <div style="background: var(--heat-1);">low</div>
+          <div style="background: var(--heat-2);">mid</div>
+          <div style="background: var(--heat-3); color: white;">high</div>
+          <div style="background: var(--heat-4); color: white;">very high</div>
+          <div style="background: var(--heat-5); color: white;">peak</div>
+        </div>
+        <div class="hint" id="heatmap-hint">Loading overview data...</div>
+      </div>
+
+      <div class="panel">
+        <h2>Visible cells</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Interval</th>
+                <th>Distance</th>
+                <th>Count</th>
+                <th>Top clade</th>
+              </tr>
+            </thead>
+            <tbody id="cell-rows"></tbody>
+          </table>
+        </div>
+        <div class="footer-meta" id="table-meta">No cells loaded.</div>
+      </div>
+    </div>
+
+    <div class="bottom-grid">
+      <div class="panel">
+        <h2>Selected cell histogram</h2>
+        <canvas id="histogram" width="760" height="320"></canvas>
+        <div class="footer-meta" id="cell-meta">No cell selected.</div>
+      </div>
+
+      <div class="panel">
+        <h2>Selected cell IDs</h2>
+        <div class="ids-box" id="ids-box">No IDs loaded.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CONFIG = {"reportTitle": "Landscape Report: landscape_14", "overviewUrl": "data/overview.json"};
+    const TABLE_LIMIT = 1200;
+    const state = {
+      overview: null,
+      visibleCells: [],
+      selected: null,
+      detailCache: new Map(),
+      scaleMax: 0
+    };
+
+    function $(id) { return document.getElementById(id); }
+    function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+
+    function setStatus(text) { $('status').textContent = text || ''; }
+
+    function percentile(values, p) {
+      if (!values.length) return 0;
+      const sorted = [...values].sort((a, b) => a - b);
+      const pp = clamp(Number(p) || 0, 0, 100);
+      if (pp >= 100) return sorted[sorted.length - 1];
+      const pos = (pp / 100) * (sorted.length - 1);
+      const lo = Math.floor(pos);
+      const hi = Math.min(sorted.length - 1, lo + 1);
+      const frac = pos - lo;
+      return sorted[lo] * (1 - frac) + sorted[hi] * frac;
+    }
+
+    function currentMinCount() {
+      return Math.max(0, parseInt($('min-count').value || '1', 10));
+    }
+
+    function currentMaxDistance() {
+      return parseInt($('max-distance').value || '-1', 10);
+    }
+
+    function currentScalePercentile() {
+      return clamp(parseFloat($('scale-percentile').value || '99.0'), 50, 100);
+    }
+
+    function emptySelectedCell(interval = -1, distance = -1) {
+      return {
+        interval,
+        distance,
+        count: 0,
+        ids: [],
+        histogram_rows: [],
+        interval_start_day: null,
+        interval_end_day: null,
+        exists: false
+      };
+    }
+
+    function detailFromEncoded(interval, encoded) {
+      if (!encoded) return emptySelectedCell(interval, -1);
+      const distance = encoded[0];
+      const count = encoded[1];
+      const ids = encoded[2] || [];
+      const histogramRows = (encoded[3] || []).map(([clade, percentage]) => ({
+        clade,
+        percentage: Number(percentage) || 0
+      }));
+      histogramRows.sort((a, b) => (b.percentage - a.percentage) || a.clade.localeCompare(b.clade));
+      return {
+        interval,
+        distance,
+        count,
+        ids,
+        histogram_rows: histogramRows,
+        interval_start_day: state.overview.interval_days > 0 ? interval * state.overview.interval_days : null,
+        interval_end_day: state.overview.interval_days > 0 ? ((interval + 1) * state.overview.interval_days - 1) : null,
+        exists: true
+      };
+    }
+
+    async function loadShardForInterval(interval) {
+      const shardSpan = state.overview.shard_interval_span || 10;
+      const shardIndex = Math.floor(interval / shardSpan);
+      const shardName = `shard_${String(shardIndex).padStart(3, '0')}.json`;
+      const shardUrl = `data/shards/${shardName}`;
+      if (state.detailCache.has(shardUrl)) {
+        return state.detailCache.get(shardUrl);
+      }
+      const response = await fetch(shardUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to load detail shard: ${shardName}`);
+      }
+      const payload = await response.json();
+      state.detailCache.set(shardUrl, payload);
+      return payload;
+    }
+
+    async function loadSelectedCell(interval, distance) {
+      if (!state.overview) return emptySelectedCell(interval, distance);
+      try {
+        const shard = await loadShardForInterval(interval);
+        const intervalCells = shard.intervals && shard.intervals[String(interval)];
+        if (!intervalCells) return emptySelectedCell(interval, distance);
+        const match = intervalCells.find((entry) => entry[0] === distance);
+        return detailFromEncoded(interval, match);
+      } catch (err) {
+        setStatus(String(err));
+        return emptySelectedCell(interval, distance);
+      }
+    }
+
+    function heatColor(value, maxValue) {
+      if (!maxValue || value <= 0) return getComputedStyle(document.documentElement).getPropertyValue('--heat-0').trim();
+      const t = clamp(value / maxValue, 0, 1);
+      const boosted = Math.pow(t, 0.62);
+      const stops = [
+        [248, 246, 239],
+        [125, 211, 252],
+        [56, 189, 248],
+        [37, 99, 235],
+        [124, 58, 237],
+        [185, 28, 28]
+      ];
+      const scaled = boosted * (stops.length - 1);
+      const idx = Math.floor(scaled);
+      const localT = scaled - idx;
+      const a = stops[idx];
+      const b = stops[Math.min(stops.length - 1, idx + 1)];
+      const r = Math.round(a[0] + (b[0] - a[0]) * localT);
+      const g = Math.round(a[1] + (b[1] - a[1]) * localT);
+      const bl = Math.round(a[2] + (b[2] - a[2]) * localT);
+      return `rgb(${r}, ${g}, ${bl})`;
+    }
+
+    function visibleCellsSorted() {
+      if (!state.overview) return [];
+      const minCount = currentMinCount();
+      const requestedMaxDistance = currentMaxDistance();
+      const limitDistance = requestedMaxDistance < 0
+        ? state.overview.max_distance
+        : clamp(requestedMaxDistance, 0, state.overview.max_distance);
+
+      const filtered = state.overview.cells.filter((cell) => cell[2] >= minCount && cell[1] <= limitDistance);
+      filtered.sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
+      return filtered;
+    }
+
+    function updateMeta() {
+      const overview = state.overview;
+      if (!overview) return;
+      $('meta-visible-cells').textContent = `${state.visibleCells.length} / ${overview.total_nonempty_cells}`;
+      $('meta-intervals').textContent = overview.interval_count;
+      $('meta-distance').textContent = overview.visible_max_distance;
+      $('meta-total-seq').textContent = overview.total_sequences;
+      $('meta-field').textContent = overview.interval_field || 'interval';
+      $('meta-days').textContent = overview.interval_days > 0 ? `${overview.interval_days} day(s)` : 'n/a';
+      $('source-name').value = overview.source_name || '';
+    }
+
+    function renderTable() {
+      const tbody = $('cell-rows');
+      const selected = state.selected || emptySelectedCell();
+      tbody.innerHTML = '';
+      const rows = [...state.visibleCells]
+        .sort((a, b) => (b[2] - a[2]) || (a[0] - b[0]) || (a[1] - b[1]))
+        .slice(0, TABLE_LIMIT);
+
+      for (const cell of rows) {
+        const tr = document.createElement('tr');
+        if (cell[0] === selected.interval && cell[1] === selected.distance) {
+          tr.classList.add('selected');
+        }
+        const topCladeText = cell[3] ? `${cell[3]} (${Number(cell[4] || 0).toFixed(1)}%)` : 'n/a';
+        tr.innerHTML = `
+          <td>${cell[0]}</td>
+          <td>${cell[1]}</td>
+          <td>${cell[2]}</td>
+          <td>${topCladeText}</td>
+        `;
+        tr.addEventListener('click', () => refreshView(cell[0], cell[1]));
+        tbody.appendChild(tr);
+      }
+      $('table-meta').textContent = `Showing top ${rows.length} rows by count out of ${state.visibleCells.length} visible cells.`;
+    }
+
+    function renderHeatmap() {
+      const overview = state.overview;
+      const canvas = $('heatmap');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (!overview || !state.visibleCells.length) {
+        ctx.fillStyle = '#64748b';
+        ctx.font = '16px Georgia';
+        ctx.fillText('No visible cells after filtering.', 30, 40);
+        $('heatmap-hint').textContent = 'No visible cells after filtering.';
+        return;
+      }
+
+      const intervalCount = Math.max(1, overview.interval_count || 1);
+      const distanceCount = Math.max(1, (overview.visible_max_distance || 0) + 1);
+      const left = 76;
+      const top = 20;
+      const width = canvas.width - left - 20;
+      const height = canvas.height - top - 60;
+      const cellW = width / intervalCount;
+      const cellH = height / distanceCount;
+
+      for (const cell of state.visibleCells) {
+        const x = left + cell[0] * cellW;
+        const y = top + height - (cell[1] + 1) * cellH;
+        ctx.fillStyle = heatColor(cell[2], state.scaleMax || overview.max_count || 1);
+        ctx.fillRect(x, y, Math.max(1, Math.ceil(cellW)), Math.max(1, Math.ceil(cellH)));
+      }
+
+      if (state.selected && state.selected.exists) {
+        const x = left + state.selected.interval * cellW;
+        const y = top + height - (state.selected.distance + 1) * cellH;
+        ctx.strokeStyle = '#111827';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 0.5, y + 0.5, Math.max(2, Math.ceil(cellW) - 1), Math.max(2, Math.ceil(cellH) - 1));
+      }
+
+      ctx.strokeStyle = '#6b7a82';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(left, top, width, height);
+      ctx.fillStyle = '#334155';
+      ctx.font = '12px Georgia';
+
+      const xTicks = Math.min(8, intervalCount - 1);
+      for (let t = 0; t <= xTicks; t++) {
+        const interval = Math.round((t / Math.max(1, xTicks)) * Math.max(0, intervalCount - 1));
+        const x = left + interval * cellW;
+        ctx.beginPath();
+        ctx.moveTo(x, top + height);
+        ctx.lineTo(x, top + height + 6);
+        ctx.stroke();
+        ctx.fillText(String(interval), x - 10, canvas.height - 16);
+      }
+
+      const yTicks = Math.min(10, distanceCount - 1);
+      for (let t = 0; t <= yTicks; t++) {
+        const distance = Math.round((t / Math.max(1, yTicks)) * Math.max(0, distanceCount - 1));
+        const y = top + height - distance * cellH;
+        ctx.beginPath();
+        ctx.moveTo(left - 6, y);
+        ctx.lineTo(left, y);
+        ctx.stroke();
+        ctx.fillText(String(distance), 24, y + 4);
+      }
+
+      ctx.save();
+      ctx.translate(16, top + height / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText('distance to reference', 0, 0);
+      ctx.restore();
+      ctx.fillText(overview.interval_field || 'interval', left + width / 2 - 24, canvas.height - 4);
+
+      $('heatmap-hint').textContent =
+        `Visible cells: ${state.visibleCells.length}. Scale max: ${state.scaleMax.toFixed(2)} (p${currentScalePercentile()}). Click a heatmap cell or a table row to inspect it.`;
+
+      canvas.onclick = (event) => {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = (event.clientX - rect.left) * scaleX;
+        const y = (event.clientY - rect.top) * scaleY;
+        if (x < left || x > left + width || y < top || y > top + height) return;
+        const interval = Math.floor((x - left) / cellW);
+        const distance = Math.floor((top + height - y) / cellH);
+        refreshView(interval, distance);
+      };
+    }
+
+    function renderHistogram() {
+      const canvas = $('histogram');
+      const ctx = canvas.getContext('2d');
+      const selected = state.selected || emptySelectedCell();
+      const rows = selected.histogram_rows || [];
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (!selected.exists || !rows.length) {
+        ctx.fillStyle = '#64748b';
+        ctx.font = '16px Georgia';
+        ctx.fillText(selected.exists ? 'Selected cell has no clade histogram.' : 'No cell selected.', 30, 40);
+        return;
+      }
+
+      const left = 180;
+      const right = 30;
+      const top = 20;
+      const barH = 22;
+      const gap = 10;
+      const maxPct = Math.max(1, ...rows.map((row) => row.percentage));
+      const usableWidth = canvas.width - left - right;
+      rows.slice(0, 10).forEach((row, index) => {
+        const y = top + index * (barH + gap);
+        const w = (row.percentage / maxPct) * usableWidth;
+        ctx.fillStyle = '#d6e4ff';
+        ctx.fillRect(left, y, usableWidth, barH);
+        ctx.fillStyle = '#2563eb';
+        ctx.fillRect(left, y, w, barH);
+        ctx.fillStyle = '#111827';
+        ctx.font = '13px Georgia';
+        ctx.fillText(row.clade, 20, y + 15);
+        ctx.fillText(`${row.percentage.toFixed(2)}%`, left + w + 8, y + 15);
+      });
+    }
+
+    function renderSelectedMeta() {
+      const selected = state.selected || emptySelectedCell();
+      if (!selected.exists) {
+        $('cell-meta').textContent = 'No cell selected.';
+        $('ids-box').textContent = 'No IDs loaded.';
+        return;
+      }
+      const intervalText = selected.interval_start_day != null
+        ? `interval ${selected.interval} (days ${selected.interval_start_day}-${selected.interval_end_day})`
+        : `interval ${selected.interval}`;
+      $('cell-meta').textContent =
+        `${intervalText}, distance ${selected.distance}, count ${selected.count}, clades ${selected.histogram_rows.length}.`;
+      $('ids-box').textContent = selected.ids && selected.ids.length ? selected.ids.join('\n') : 'No IDs stored in this cell.';
+    }
+
+    function renderAll() {
+      updateMeta();
+      renderTable();
+      renderHeatmap();
+      renderHistogram();
+      renderSelectedMeta();
+    }
+
+    async function refreshView(selectedInterval = -1, selectedDistance = -1) {
+      if (!state.overview) return;
+      const requestedMaxDistance = currentMaxDistance();
+      const limitDistance = requestedMaxDistance < 0
+        ? state.overview.max_distance
+        : clamp(requestedMaxDistance, 0, state.overview.max_distance);
+      state.visibleCells = visibleCellsSorted();
+      state.overview.visible_max_distance = limitDistance;
+      const counts = state.visibleCells.map((cell) => cell[2]);
+      state.scaleMax = percentile(counts, currentScalePercentile());
+      if (state.scaleMax <= 0) {
+        state.scaleMax = counts.length ? Math.max(...counts) : 0;
+      }
+
+      let interval = selectedInterval;
+      let distance = selectedDistance;
+      const stillVisible = state.visibleCells.some((cell) => cell[0] === interval && cell[1] === distance);
+      if (!stillVisible) {
+        if (state.visibleCells.length) {
+          interval = state.visibleCells[0][0];
+          distance = state.visibleCells[0][1];
+        } else {
+          interval = -1;
+          distance = -1;
+        }
+      }
+
+      state.selected = interval >= 0 ? await loadSelectedCell(interval, distance) : emptySelectedCell();
+      setStatus(`Loaded ${state.overview.source_name}. Visible nonempty cells: ${state.visibleCells.length} / ${state.overview.total_nonempty_cells}`);
+      renderAll();
+    }
+
+    async function loadOverview() {
+      try {
+        const response = await fetch(CONFIG.overviewUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to load overview: ${response.status}`);
+        }
+        state.overview = await response.json();
+        $('max-distance').value = '-1';
+        $('scale-percentile').value = '99.0';
+        await refreshView(-1, -1);
+      } catch (err) {
+        setStatus(String(err));
+      }
+    }
+
+    $('refresh-btn').addEventListener('click', () => refreshView(
+      state.selected?.interval ?? -1,
+      state.selected?.distance ?? -1
+    ));
+    $('min-count').addEventListener('change', () => refreshView(
+      state.selected?.interval ?? -1,
+      state.selected?.distance ?? -1
+    ));
+    $('max-distance').addEventListener('change', () => refreshView(
+      state.selected?.interval ?? -1,
+      state.selected?.distance ?? -1
+    ));
+    $('scale-percentile').addEventListener('change', () => refreshView(
+      state.selected?.interval ?? -1,
+      state.selected?.distance ?? -1
+    ));
+
+    loadOverview();
+  </script>
+</body>
+</html>
