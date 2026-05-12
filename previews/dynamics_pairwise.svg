@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 360">
+  <rect width="720" height="360" rx="18" fill="#fffdf8"/>
+  <rect x="22" y="24" width="676" height="312" rx="16" fill="#ffffff" stroke="#d8ddd8"/>
+  <rect x="44" y="50" width="350" height="190" rx="10" fill="#faf6ee" stroke="#e7dcc8"/>
+  <rect x="60" y="70" width="22" height="150" fill="#f6f6f0"/>
+  <rect x="84" y="90" width="22" height="130" fill="#f2d97b"/>
+  <rect x="108" y="105" width="22" height="115" fill="#e59f2a"/>
+  <rect x="132" y="82" width="22" height="138" fill="#c74b19"/>
+  <rect x="156" y="120" width="22" height="100" fill="#7f1d1d"/>
+  <rect x="180" y="95" width="22" height="125" fill="#e59f2a"/>
+  <rect x="204" y="72" width="22" height="148" fill="#c74b19"/>
+  <rect x="228" y="140" width="22" height="80" fill="#f2d97b"/>
+  <rect x="252" y="78" width="22" height="142" fill="#7f1d1d"/>
+  <rect x="276" y="110" width="22" height="110" fill="#e59f2a"/>
+  <rect x="300" y="66" width="22" height="154" fill="#c74b19"/>
+  <path d="M 450 210 C 490 170, 520 178, 555 128 S 615 72, 670 86" fill="none" stroke="#b45309" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 450 238 C 500 224, 526 196, 560 186 S 620 168, 670 148" fill="none" stroke="#c74b19" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="450" cy="210" r="6" fill="#b45309"/>
+  <circle cx="555" cy="128" r="6" fill="#b45309"/>
+  <circle cx="670" cy="86" r="6" fill="#b45309"/>
+  <circle cx="450" cy="238" r="6" fill="#c74b19"/>
+  <circle cx="560" cy="186" r="6" fill="#c74b19"/>
+  <circle cx="670" cy="148" r="6" fill="#c74b19"/>
+  <rect x="44" y="258" width="626" height="54" rx="10" fill="#faf6ee" stroke="#e7dcc8"/>
+  <text x="58" y="286" font-family="Georgia, serif" font-size="18" fill="#15222c">Bucket-to-bucket change signal across time buckets</text>
+  <text x="44" y="34" font-family="Georgia, serif" font-size="18" fill="#15222c">Mutation dynamics: pairwise</text>
+</svg>

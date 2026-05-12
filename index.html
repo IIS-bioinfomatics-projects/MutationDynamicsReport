@@ -135,7 +135,7 @@
   <div class="app">
     <section class="hero">
       <h1>CodonRain Publication Reports</h1>
-      <p>This report hub brings together interactive static pages generated from the current SARS-CoV-2 analysis outputs. The dynamics report focuses on mutation activity over time, while the landscape reports show how sequence density is distributed by time bucket and distance to the reference at different temporal resolutions.</p>
+      <p>This report hub brings together interactive static pages generated from the current SARS-CoV-2 analysis outputs. The dynamics reports show both reference-based and pairwise mutation signals over time, while the landscape reports show how sequence density is distributed by time bucket and distance to the reference at different temporal resolutions.</p>
       <div class="sub">
         <div class="pill">Static publication site</div>
         <div class="pill">Interactive reports</div>
@@ -146,16 +146,30 @@
     <section class="cards">
       <article class="card">
         <div class="preview">
-          <img src="previews/dynamics.svg" alt="Dynamics Report preview" />
+          <img src="previews/dynamics_reference.svg" alt="Dynamics Report: Reference Signal preview" />
         </div>
         <div class="body">
           <div class="eyebrow">Mutation Dynamics</div>
-          <h2>Dynamics Report</h2>
-          <div class="desc">Interactive mutation-dynamics report with coding-region heatmaps, temporal region trends, and grouped NSP views.</div>
-          <div class="stats"><div class="stat"><div class="k">Type</div><div class="v">Dynamics</div></div><div class="stat"><div class="k">View</div><div class="v">Static HTML</div></div><div class="stat"><div class="k">Focus</div><div class="v">Temporal signal</div></div></div>
-          <ul class="bullets"><li>Heatmaps of temporal mutation activity across coding positions</li><li>Region-level curves for ORF1ab, S, N, M, and E</li><li>Grouped or individual non-structural protein trend views</li></ul>
-          <div class="tags"><span class="tag">heatmap</span><span class="tag">region lines</span><span class="tag">NSP groups</span><span class="tag">interactive</span></div>
-          <div class="actions"><a href="dynamics.html">Open Report</a></div>
+          <h2>Dynamics Report: Reference Signal</h2>
+          <div class="desc">Interactive reference-mode dynamics report with coding-region heatmaps, temporal region trends, and grouped NSP views.</div>
+          <div class="stats"><div class="stat"><div class="k">Buckets</div><div class="v">160</div></div><div class="stat"><div class="k">Window</div><div class="v">14 d</div></div><div class="stat"><div class="k">Mode</div><div class="v">Reference</div></div></div>
+          <ul class="bullets"><li>Heatmaps of accumulated signal relative to the reference</li><li>Region-level curves for ORF1ab, S, N, M, and E</li><li>Grouped or individual non-structural protein trend views</li></ul>
+          <div class="tags"><span class="tag">reference signal</span><span class="tag">heatmap</span><span class="tag">region lines</span><span class="tag">NSP groups</span><span class="tag">interactive</span></div>
+          <div class="actions"><a href="dynamics_reference.html">Open Report</a></div>
+        </div>
+      </article>
+<article class="card">
+        <div class="preview">
+          <img src="previews/dynamics_pairwise.svg" alt="Dynamics Report: Pairwise Signal preview" />
+        </div>
+        <div class="body">
+          <div class="eyebrow">Mutation Dynamics</div>
+          <h2>Dynamics Report: Pairwise Signal</h2>
+          <div class="desc">Interactive pairwise dynamics report showing bucket-to-bucket change signal across coding positions and genomic regions.</div>
+          <div class="stats"><div class="stat"><div class="k">Buckets</div><div class="v">160</div></div><div class="stat"><div class="k">Window</div><div class="v">14 d</div></div><div class="stat"><div class="k">Mode</div><div class="v">Pairwise</div></div></div>
+          <ul class="bullets"><li>Heatmaps of signal computed from predecessor-to-current comparisons</li><li>Region-level curves for ORF1ab, S, N, M, and E</li><li>Grouped or individual non-structural protein trend views</li></ul>
+          <div class="tags"><span class="tag">pairwise signal</span><span class="tag">heatmap</span><span class="tag">region lines</span><span class="tag">NSP groups</span><span class="tag">interactive</span></div>
+          <div class="actions"><a href="dynamics_pairwise.html">Open Report</a></div>
         </div>
       </article>
 <article class="card">
