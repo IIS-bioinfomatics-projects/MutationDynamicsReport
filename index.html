@@ -135,11 +135,11 @@
   <div class="app">
     <section class="hero">
       <h1>CodonRain Publication Reports</h1>
-      <p>This report hub brings together interactive static pages generated from the current SARS-CoV-2 analysis outputs. The dynamics reports show both reference-based and pairwise mutation signals over time, while the landscape reports show how sequence density is distributed by time bucket and distance to the reference at different temporal resolutions.</p>
+      <p>This report hub brings together interactive static pages generated from the current SARS-CoV-2 analysis outputs. The dynamics reports show both reference-based and pairwise mutation signals over time, the clustering report groups identical coding-region states and their nearest earlier relatives, and the landscape reports show how sequence density is distributed by time bucket and distance to the reference at different temporal resolutions.</p>
       <div class="sub">
         <div class="pill">Static publication site</div>
         <div class="pill">Interactive reports</div>
-        <div class="pill">Landscape + dynamics</div>
+        <div class="pill">Landscape + dynamics + clustering</div>
       </div>
     </section>
 
@@ -170,6 +170,20 @@
           <ul class="bullets"><li>Heatmaps of signal computed from predecessor-to-current comparisons</li><li>Region-level curves for ORF1ab, S, N, M, and E</li><li>Grouped or individual non-structural protein trend views</li></ul>
           <div class="tags"><span class="tag">pairwise signal</span><span class="tag">heatmap</span><span class="tag">region lines</span><span class="tag">NSP groups</span><span class="tag">interactive</span></div>
           <div class="actions"><a href="dynamics_pairwise.html">Open Report</a></div>
+        </div>
+      </article>
+<article class="card">
+        <div class="preview">
+          <img src="previews/clusters.svg" alt="Clusters of Identical Coding Regions preview" />
+        </div>
+        <div class="body">
+          <div class="eyebrow">Clustering</div>
+          <h2>Clusters of Identical Coding Regions</h2>
+          <div class="desc">Genomes whose coding-region state is identical are grouped into clusters. The report shows how many clusters exist per size, how long they persist, and how far and how long ago their nearest earlier relative was observed.</div>
+          <div class="stats"><div class="stat"><div class="k">Clusters</div><div class="v">4,877,862</div></div><div class="stat"><div class="k">Genomes</div><div class="v">8,308,547</div></div><div class="stat"><div class="k">Cells</div><div class="v">1,218 binned</div></div></div>
+          <ul class="bullets"><li>Cluster count by cluster size on double-logarithmic axes</li><li>Rotatable 3D view of cluster size, lifespan and cluster count</li><li>Time interval and edit distance to the nearest predecessor</li></ul>
+          <div class="tags"><span class="tag">identical states</span><span class="tag">lifespan</span><span class="tag">predecessor</span><span class="tag">3D</span><span class="tag">interactive</span></div>
+          <div class="actions"><a href="clusters.html">Open Report</a></div>
         </div>
       </article>
 <article class="card">

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 360">
+  <rect width="720" height="360" rx="18" fill="#fffdf8"/>
+  <rect x="22" y="24" width="676" height="312" rx="16" fill="#ffffff" stroke="#d8ddd8"/>
+  <rect x="44" y="50" width="340" height="190" rx="10" fill="#faf6ee" stroke="#e7dcc8"/>
+  <rect x="60" y="62" width="18" height="150" rx="3" fill="#0f766e"/><rect x="86" y="86" width="18" height="126" rx="3" fill="#12857c"/><rect x="112" y="108" width="18" height="104" rx="3" fill="#2f9c86"/><rect x="138" y="126" width="18" height="86" rx="3" fill="#5cb08c"/><rect x="164" y="144" width="18" height="68" rx="3" fill="#8cc194"/><rect x="190" y="160" width="18" height="52" rx="3" fill="#b9cf9f"/><rect x="216" y="174" width="18" height="38" rx="3" fill="#dcd6a7"/><rect x="242" y="186" width="18" height="26" rx="3" fill="#e9c98a"/><rect x="268" y="194" width="18" height="18" rx="3" fill="#e0a45c"/><rect x="294" y="200" width="18" height="12" rx="3" fill="#c9743a"/><rect x="320" y="204" width="18" height="8" rx="3" fill="#a8512a"/>
+  <rect x="404" y="50" width="266" height="190" rx="10" fill="#faf6ee" stroke="#e7dcc8"/>
+  <path d="M 424 214 L 556 244 L 676 202" fill="none" stroke="#c9bfa6" stroke-width="2"/>
+  <rect x="432" y="196" width="20" height="16" rx="2" fill="#7f1d1d" opacity="0.9"/><rect x="454" y="190" width="20" height="16" rx="2" fill="#c74b19" opacity="0.9"/><rect x="476" y="184" width="20" height="16" rx="2" fill="#e59f2a" opacity="0.9"/><rect x="432" y="176" width="20" height="16" rx="2" fill="#c74b19" opacity="0.9"/><rect x="454" y="170" width="20" height="16" rx="2" fill="#e59f2a" opacity="0.9"/><rect x="476" y="164" width="20" height="16" rx="2" fill="#f2d97b" opacity="0.9"/><rect x="432" y="156" width="20" height="16" rx="2" fill="#e59f2a" opacity="0.9"/><rect x="454" y="150" width="20" height="16" rx="2" fill="#f2d97b" opacity="0.9"/><rect x="476" y="144" width="20" height="16" rx="2" fill="#faf0c8" opacity="0.9"/>
+  <rect x="44" y="258" width="626" height="54" rx="10" fill="#faf6ee" stroke="#e7dcc8"/>
+  <text x="58" y="286" font-family="Georgia, serif" font-size="18" fill="#15222c">Cluster sizes, lifespans and nearest earlier relatives</text>
+  <text x="44" y="34" font-family="Georgia, serif" font-size="18" fill="#15222c">Clusters of identical coding regions</text>
+</svg>
