@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Unique gene states by period</title>
+  <style>
+    :root {
+      --bg: #f3efe7;
+      --panel: #fffdf8;
+      --ink: #15222c;
+      --muted: #64748b;
+      --line: #d8ddd8;
+      --accent: #0f766e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1100px 420px at 10% -10%, #e9efe7, transparent),
+        radial-gradient(1000px 420px at 100% 0%, #eee3d8, transparent),
+        var(--bg);
+    }
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 16px; }
+    .head, .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .title { font-weight: 800; font-size: 22px; margin-bottom: 4px; }
+    .status { color: var(--muted); font-size: 13px; font-family: Consolas, monospace; }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: end;
+      margin-top: 10px;
+    }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; font-weight: 700; }
+    select, button {
+      border: 1px solid #8fc8c1;
+      border-radius: 9px;
+      padding: 8px 12px;
+      background: #e6f5f3;
+      color: #0f4f48;
+      font-weight: 700;
+    }
+    button { cursor: pointer; }
+    label.check-row {
+      display: flex;
+      color: var(--ink);
+      font-weight: 600;
+      margin-bottom: 0;
+      cursor: pointer;
+    }
+    canvas { width: 100%; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+    .hint { color: var(--muted); font-size: 13px; margin-top: 8px; line-height: 1.45; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 7px 8px; text-align: left; }
+    th { color: var(--muted); font-size: 12px; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .legend { display: flex; flex-wrap: wrap; gap: 10px 16px; margin: 8px 0; font-size: 13px; }
+    .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+    .check-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      margin-top: 10px;
+    }
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+    .check-row input { width: auto; }
+    .nsp-block { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+    .hub-link { margin: 0 0 8px; font-size: 14px; }
+    .hub-link a { color: var(--accent); text-decoration: none; font-weight: 700; }
+    .hub-link a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="head">
+      <p id="hub-link" class="hub-link" hidden><a href="index.html">← К каталогу отчётов</a></p>
+      <div class="title">Unique gene states by period</div>
+      <div class="status" id="status">No file loaded</div>
+      <div class="toolbar">
+        <button id="open-btn" type="button">Open TSV</button>
+        <div>
+          <label for="metric">Metric</label>
+          <select id="metric"></select>
+        </div>
+        <div>
+          <label for="group-by">Group bars by</label>
+          <select id="group-by">
+            <option value="gene">Gene</option>
+            <option value="period">Period</option>
+          </select>
+        </div>
+      </div>
+      <div class="check-grid" id="region-checks"></div>
+      <div class="check-grid">
+        <label class="check-row"><input id="show-orf1ab-proteins" type="checkbox" /> Show ORF1ab proteins</label>
+        <label class="check-row"><input id="group-nsp-lines" type="checkbox" /> Group NSP lines</label>
+        <button id="nsp-show-all" type="button">Show all NSP</button>
+        <button id="nsp-hide-all" type="button">Hide all NSP</button>
+      </div>
+      <div class="nsp-block" id="nsp-checks"></div>
+    </div>
+    <div class="panel">
+      <div class="legend" id="legend"></div>
+      <canvas id="main-chart" width="1400" height="520"></canvas>
+      <div class="hint" id="main-hint"></div>
+    </div>
+    <div class="panel">
+      <div class="title" style="font-size:18px;">Sequences per period</div>
+      <canvas id="seq-chart" width="1200" height="180"></canvas>
+      <div class="hint">Same N for every gene inside a period. unique_per_seq between periods will fall when sampling is dense.</div>
+    </div>
+    <div class="panel">
+      <table>
+        <thead>
+          <tr>
+            <th>Period</th><th>Gene</th>
+            <th class="num">n_seq</th><th class="num">n_unique</th>
+            <th class="num">per seq</th><th class="num">per nt</th><th class="num">share</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+  <script>
+    const METRICS = [["unique_per_nt", "Unique gene states per nucleotide"], ["unique_share", "Share of unique coding states"], ["unique_per_seq", "Unique gene states per sequence"], ["n_unique", "Unique gene state count"]];
+    const GENE_COLORS = {"ORF1ab": "#2563eb", "S": "#dc2626", "N": "#0f766e", "M": "#b45309", "E": "#7c3aed"};
+    const NSP_COLORS = {"nsp1": "#7dd3fc", "nsp2": "#0284c7", "nsp3": "#fda4af", "nsp4": "#f59e0b", "nsp5": "#e11d48", "nsp6": "#ca8a04", "nsp7": "#6ee7b7", "nsp8": "#059669", "nsp9": "#a78bfa", "nsp10": "#6366f1", "nsp11": "#94a3b8", "nsp12": "#10b981", "nsp13": "#d946ef", "nsp14": "#f472b6", "nsp15": "#8b5cf6", "nsp16": "#0ea5e9"};
+    const NSP_GROUP_COLORS = {"Host modulation": "#38bdf8", "Proteases": "#fb7185", "Membrane remodeling": "#fbbf24", "Polymerase core": "#34d399", "RNA processing": "#c084fc"};
+    const PERIOD_COLORS = ["#2563eb", "#dc2626", "#0f766e", "#b45309", "#7c3aed", "#0f172a"];
+    const STATIC_MODE = true;
+    const BUILTIN_NSP = ["nsp1","nsp2","nsp3","nsp4","nsp5","nsp6","nsp7","nsp8","nsp9","nsp10","nsp11","nsp12","nsp13","nsp14","nsp15","nsp16"];
+    const BUILTIN_GROUPS = Object.keys(NSP_GROUP_COLORS);
+    let payload = {"loaded": true, "source_path": "gene_unique_variants.tsv", "status": "Loaded 156 rows, 6 periods, 5 genes, 16 nsp.", "rows": [{"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "ORF1ab", "kind": "region", "gene_start": 266, "gene_end": 21555, "gene_length": 21290, "n_seq": 1321468, "n_unique": 508112, "n_unique_coding": 692154, "unique_per_seq": 0.3845057164, "unique_per_nt": 23.86622828, "unique_share": 0.7341025263}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "S", "kind": "region", "gene_start": 21563, "gene_end": 25384, "gene_length": 3822, "n_seq": 1321468, "n_unique": 106238, "n_unique_coding": 692154, "unique_per_seq": 0.08039392554, "unique_per_nt": 27.79644165, "unique_share": 0.1534889634}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "N", "kind": "region", "gene_start": 28274, "gene_end": 29533, "gene_length": 1260, "n_seq": 1321468, "n_unique": 45298, "n_unique_coding": 692154, "unique_per_seq": 0.03427854477, "unique_per_nt": 35.95079365, "unique_share": 0.06544497323}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "M", "kind": "region", "gene_start": 26523, "gene_end": 27191, "gene_length": 669, "n_seq": 1321468, "n_unique": 5981, "n_unique_coding": 692154, "unique_per_seq": 0.004526027115, "unique_per_nt": 8.940209268, "unique_share": 0.008641140555}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "E", "kind": "region", "gene_start": 26245, "gene_end": 26472, "gene_length": 228, "n_seq": 1321468, "n_unique": 918, "n_unique_coding": 692154, "unique_per_seq": 0.0006946819749, "unique_per_nt": 4.026315789, "unique_share": 0.001326294437}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "nsp1", "kind": "nsp", "gene_start": 266, "gene_end": 805, "gene_length": 540, "n_seq": 1321468, "n_unique": 5292, "n_unique_coding": 692154, "unique_per_seq": 0.004004637267, "unique_per_nt": 9.8, "unique_share": 0.007645697345}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "nsp2", "kind": "nsp", "gene_start": 806, "gene_end": 2719, "gene_length": 1914, "n_seq": 1321468, "n_unique": 41369, "n_unique_coding": 692154, "unique_per_seq": 0.03130533619, "unique_per_nt": 21.6138976, "unique_share": 0.05976849083}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "nsp3", "kind": "nsp", "gene_start": 2720, "gene_end": 8554, "gene_length": 5835, "n_seq": 1321468, "n_unique": 147706, "n_unique_coding": 692154, "unique_per_seq": 0.1117741784, "unique_per_nt": 25.31379606, "unique_share": 0.213400486}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "nsp4", "kind": "nsp", "gene_start": 8555, "gene_end": 10054, "gene_length": 1500, "n_seq": 1321468, "n_unique": 15700, "n_unique_coding": 692154, "unique_per_seq": 0.01188072659, "unique_per_nt": 10.46666667, "unique_share": 0.02268281336}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "nsp5", "kind": "nsp", "gene_start": 10055, "gene_end": 10972, "gene_length": 918, "n_seq": 1321468, "n_unique": 7039, "n_unique_coding": 692154, "unique_per_seq": 0.005326651875, "unique_per_nt": 7.667755991, "unique_share": 0.01016970212}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "nsp6", "kind": "nsp", "gene_start": 10973, "gene_end": 11842, "gene_length": 870, "n_seq": 1321468, "n_unique": 9540, "n_unique_coding": 692154, "unique_per_seq": 0.007219244053, "unique_per_nt": 10.96551724, "unique_share": 0.01378305984}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "nsp7", "kind": "nsp", "gene_start": 11843, "gene_end": 12091, "gene_length": 249, "n_seq": 1321468, "n_unique": 1049, "n_unique_coding": 692154, "unique_per_seq": 0.0007938141521, "unique_per_nt": 4.212851406, "unique_share": 0.001515558676}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "nsp8", "kind": "nsp", "gene_start": 12092, "gene_end": 12685, "gene_length": 594, "n_seq": 1321468, "n_unique": 2835, "n_unique_coding": 692154, "unique_per_seq": 0.002145341393, "unique_per_nt": 4.772727273, "unique_share": 0.004095909292}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "nsp9", "kind": "nsp", "gene_start": 12686, "gene_end": 13024, "gene_length": 339, "n_seq": 1321468, "n_unique": 1682, "n_unique_coding": 692154, "unique_per_seq": 0.001272826886, "unique_per_nt": 4.961651917, "unique_share": 0.002430095037}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "nsp10", "kind": "nsp", "gene_start": 13025, "gene_end": 13441, "gene_length": 417, "n_seq": 1321468, "n_unique": 1306, "n_unique_coding": 692154, "unique_per_seq": 0.0009882948357, "unique_per_nt": 3.131894484, "unique_share": 0.001886863328}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "nsp11", "kind": "nsp", "gene_start": 13442, "gene_end": 13480, "gene_length": 39, "n_seq": 1321468, "n_unique": 82, "n_unique_coding": 692154, "unique_per_seq": 6.205220255e-05, "unique_per_nt": 2.102564103, "unique_share": 0.0001184707449}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "nsp12", "kind": "nsp", "gene_start": 13442, "gene_end": 16236, "gene_length": 2795, "n_seq": 1321468, "n_unique": 34179, "n_unique_coding": 692154, "unique_per_seq": 0.02586441745, "unique_per_nt": 12.22862254, "unique_share": 0.04938062917}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "nsp13", "kind": "nsp", "gene_start": 16237, "gene_end": 18039, "gene_length": 1803, "n_seq": 1321468, "n_unique": 20441, "n_unique_coding": 692154, "unique_per_seq": 0.01546840332, "unique_per_nt": 11.33721575, "unique_share": 0.02953244509}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "nsp14", "kind": "nsp", "gene_start": 18040, "gene_end": 19620, "gene_length": 1581, "n_seq": 1321468, "n_unique": 17538, "n_unique_coding": 692154, "unique_per_seq": 0.013271604, "unique_per_nt": 11.09297913, "unique_share": 0.02533829177}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "nsp15", "kind": "nsp", "gene_start": 19621, "gene_end": 20658, "gene_length": 1038, "n_seq": 1321468, "n_unique": 8161, "n_unique_coding": 692154, "unique_per_seq": 0.006175707622, "unique_per_nt": 7.862235067, "unique_share": 0.01179072865}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "nsp16", "kind": "nsp", "gene_start": 20659, "gene_end": 21552, "gene_length": 894, "n_seq": 1321468, "n_unique": 6309, "n_unique_coding": 692154, "unique_per_seq": 0.004774235926, "unique_per_nt": 7.05704698, "unique_share": 0.009115023535}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "Host modulation", "kind": "nsp_group", "gene_start": 266, "gene_end": 2719, "gene_length": 2454, "n_seq": 1321468, "n_unique": 63563, "n_unique_coding": 692154, "unique_per_seq": 0.04810029452, "unique_per_nt": 25.90179299, "unique_share": 0.09183360928}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "Proteases", "kind": "nsp_group", "gene_start": 2720, "gene_end": 10972, "gene_length": 6753, "n_seq": 1321468, "n_unique": 176043, "n_unique_coding": 692154, "unique_per_seq": 0.1332177548, "unique_per_nt": 26.06885829, "unique_share": 0.254340797}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "Membrane remodeling", "kind": "nsp_group", "gene_start": 8555, "gene_end": 11842, "gene_length": 2370, "n_seq": 1321468, "n_unique": 39773, "n_unique_coding": 692154, "unique_per_seq": 0.03009758844, "unique_per_nt": 16.78185654, "unique_share": 0.0574626456}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "Polymerase core", "kind": "nsp_group", "gene_start": 11843, "gene_end": 16236, "gene_length": 3638, "n_seq": 1321468, "n_unique": 54995, "n_unique_coding": 692154, "unique_per_seq": 0.04161659609, "unique_per_nt": 15.11682243, "unique_share": 0.0794548612}, {"period": "pre-Delta", "period_start": "2019-12-23", "period_end": "2021-04-30", "gene": "RNA processing", "kind": "nsp_group", "gene_start": 12686, "gene_end": 21552, "gene_length": 6072, "n_seq": 1321468, "n_unique": 132163, "n_unique_coding": 692154, "unique_per_seq": 0.1000122591, "unique_per_nt": 21.76597497, "unique_share": 0.1909445008}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "ORF1ab", "kind": "region", "gene_start": 266, "gene_end": 21555, "gene_length": 21290, "n_seq": 2173577, "n_unique": 861187, "n_unique_coding": 1227660, "unique_per_seq": 0.3962072657, "unique_per_nt": 40.45030531, "unique_share": 0.7014865679}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "S", "kind": "region", "gene_start": 21563, "gene_end": 25384, "gene_length": 3822, "n_seq": 2173577, "n_unique": 199159, "n_unique_coding": 1227660, "unique_per_seq": 0.09162730375, "unique_per_nt": 52.10858189, "unique_share": 0.1622265122}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "N", "kind": "region", "gene_start": 28274, "gene_end": 29533, "gene_length": 1260, "n_seq": 2173577, "n_unique": 52369, "n_unique_coding": 1227660, "unique_per_seq": 0.02409346437, "unique_per_nt": 41.56269841, "unique_share": 0.0426575762}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "M", "kind": "region", "gene_start": 26523, "gene_end": 27191, "gene_length": 669, "n_seq": 2173577, "n_unique": 7924, "n_unique_coding": 1227660, "unique_per_seq": 0.003645603537, "unique_per_nt": 11.8445441, "unique_share": 0.006454555822}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "E", "kind": "region", "gene_start": 26245, "gene_end": 26472, "gene_length": 228, "n_seq": 2173577, "n_unique": 960, "n_unique_coding": 1227660, "unique_per_seq": 0.0004416682731, "unique_per_nt": 4.210526316, "unique_share": 0.0007819754655}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "nsp1", "kind": "nsp", "gene_start": 266, "gene_end": 805, "gene_length": 540, "n_seq": 2173577, "n_unique": 8841, "n_unique_coding": 1227660, "unique_per_seq": 0.004067488752, "unique_per_nt": 16.37222222, "unique_share": 0.007201505303}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "nsp2", "kind": "nsp", "gene_start": 806, "gene_end": 2719, "gene_length": 1914, "n_seq": 2173577, "n_unique": 59539, "n_unique_coding": 1227660, "unique_per_seq": 0.02739217428, "unique_per_nt": 31.10710554, "unique_share": 0.04849795546}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "nsp3", "kind": "nsp", "gene_start": 2720, "gene_end": 8554, "gene_length": 5835, "n_seq": 2173577, "n_unique": 233092, "n_unique_coding": 1227660, "unique_per_seq": 0.107238897, "unique_per_nt": 39.94721508, "unique_share": 0.1898669013}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "nsp4", "kind": "nsp", "gene_start": 8555, "gene_end": 10054, "gene_length": 1500, "n_seq": 2173577, "n_unique": 25362, "n_unique_coding": 1227660, "unique_per_seq": 0.01166832369, "unique_per_nt": 16.908, "unique_share": 0.02065881433}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "nsp5", "kind": "nsp", "gene_start": 10055, "gene_end": 10972, "gene_length": 918, "n_seq": 2173577, "n_unique": 7551, "n_unique_coding": 1227660, "unique_per_seq": 0.00347399701, "unique_per_nt": 8.225490196, "unique_share": 0.006150725771}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "nsp6", "kind": "nsp", "gene_start": 10973, "gene_end": 11842, "gene_length": 870, "n_seq": 2173577, "n_unique": 13778, "n_unique_coding": 1227660, "unique_per_seq": 0.006338859861, "unique_per_nt": 15.83678161, "unique_share": 0.01122297705}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "nsp7", "kind": "nsp", "gene_start": 11843, "gene_end": 12091, "gene_length": 249, "n_seq": 2173577, "n_unique": 1122, "n_unique_coding": 1227660, "unique_per_seq": 0.0005161997942, "unique_per_nt": 4.506024096, "unique_share": 0.0009139338253}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "nsp8", "kind": "nsp", "gene_start": 12092, "gene_end": 12685, "gene_length": 594, "n_seq": 2173577, "n_unique": 3043, "n_unique_coding": 1227660, "unique_per_seq": 0.001399996411, "unique_per_nt": 5.122895623, "unique_share": 0.002478699314}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "nsp9", "kind": "nsp", "gene_start": 12686, "gene_end": 13024, "gene_length": 339, "n_seq": 2173577, "n_unique": 2373, "n_unique_coding": 1227660, "unique_per_seq": 0.001091748763, "unique_per_nt": 7.0, "unique_share": 0.001932945604}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "nsp10", "kind": "nsp", "gene_start": 13025, "gene_end": 13441, "gene_length": 417, "n_seq": 2173577, "n_unique": 1968, "n_unique_coding": 1227660, "unique_per_seq": 0.0009054199598, "unique_per_nt": 4.71942446, "unique_share": 0.001603049704}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "nsp11", "kind": "nsp", "gene_start": 13442, "gene_end": 13480, "gene_length": 39, "n_seq": 2173577, "n_unique": 87, "n_unique_coding": 1227660, "unique_per_seq": 4.002618725e-05, "unique_per_nt": 2.230769231, "unique_share": 7.086652656e-05}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "nsp12", "kind": "nsp", "gene_start": 13442, "gene_end": 16236, "gene_length": 2795, "n_seq": 2173577, "n_unique": 54830, "n_unique_coding": 1227660, "unique_per_seq": 0.02522569939, "unique_per_nt": 19.61717352, "unique_share": 0.04466220289}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "nsp13", "kind": "nsp", "gene_start": 16237, "gene_end": 18039, "gene_length": 1803, "n_seq": 2173577, "n_unique": 28180, "n_unique_coding": 1227660, "unique_per_seq": 0.0129648041, "unique_per_nt": 15.62950638, "unique_share": 0.02295423814}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "nsp14", "kind": "nsp", "gene_start": 18040, "gene_end": 19620, "gene_length": 1581, "n_seq": 2173577, "n_unique": 26289, "n_unique_coding": 1227660, "unique_per_seq": 0.01209480962, "unique_per_nt": 16.62808349, "unique_share": 0.02141390939}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "nsp15", "kind": "nsp", "gene_start": 19621, "gene_end": 20658, "gene_length": 1038, "n_seq": 2173577, "n_unique": 11564, "n_unique_coding": 1227660, "unique_per_seq": 0.005320262406, "unique_per_nt": 11.14065511, "unique_share": 0.009419546128}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "nsp16", "kind": "nsp", "gene_start": 20659, "gene_end": 21552, "gene_length": 894, "n_seq": 2173577, "n_unique": 7548, "n_unique_coding": 1227660, "unique_per_seq": 0.003472616797, "unique_per_nt": 8.44295302, "unique_share": 0.006148282098}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "Host modulation", "kind": "nsp_group", "gene_start": 266, "gene_end": 2719, "gene_length": 2454, "n_seq": 2173577, "n_unique": 98441, "n_unique_coding": 1227660, "unique_per_seq": 0.04528986091, "unique_per_nt": 40.11450693, "unique_share": 0.08018588208}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "Proteases", "kind": "nsp_group", "gene_start": 2720, "gene_end": 10972, "gene_length": 6753, "n_seq": 2173577, "n_unique": 273656, "n_unique_coding": 1227660, "unique_per_seq": 0.1259012218, "unique_per_nt": 40.52361913, "unique_share": 0.2229086229}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "Membrane remodeling", "kind": "nsp_group", "gene_start": 8555, "gene_end": 11842, "gene_length": 2370, "n_seq": 2173577, "n_unique": 60597, "n_unique_coding": 1227660, "unique_per_seq": 0.02787892952, "unique_per_nt": 25.56835443, "unique_share": 0.04935975759}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "Polymerase core", "kind": "nsp_group", "gene_start": 11843, "gene_end": 16236, "gene_length": 3638, "n_seq": 2173577, "n_unique": 83014, "n_unique_coding": 1227660, "unique_per_seq": 0.03819234377, "unique_per_nt": 22.81858164, "unique_share": 0.06761969927}, {"period": "Delta", "period_start": "2021-05-01", "period_end": "2021-11-25", "gene": "RNA processing", "kind": "nsp_group", "gene_start": 12686, "gene_end": 21552, "gene_length": 6072, "n_seq": 2173577, "n_unique": 208018, "n_unique_coding": 1227660, "unique_per_seq": 0.09570307378, "unique_per_nt": 34.2585639, "unique_share": 0.1694426796}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "ORF1ab", "kind": "region", "gene_start": 266, "gene_end": 21555, "gene_length": 21290, "n_seq": 1312173, "n_unique": 511843, "n_unique_coding": 756668, "unique_per_seq": 0.3900728029, "unique_per_nt": 24.04147487, "unique_share": 0.6764433014}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "S", "kind": "region", "gene_start": 21563, "gene_end": 25384, "gene_length": 3822, "n_seq": 1312173, "n_unique": 115681, "n_unique_coding": 756668, "unique_per_seq": 0.08815986916, "unique_per_nt": 30.26713762, "unique_share": 0.1528821095}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "N", "kind": "region", "gene_start": 28274, "gene_end": 29533, "gene_length": 1260, "n_seq": 1312173, "n_unique": 29922, "n_unique_coding": 756668, "unique_per_seq": 0.02280339559, "unique_per_nt": 23.74761905, "unique_share": 0.03954442371}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "M", "kind": "region", "gene_start": 26523, "gene_end": 27191, "gene_length": 669, "n_seq": 1312173, "n_unique": 5950, "n_unique_coding": 756668, "unique_per_seq": 0.004534463062, "unique_per_nt": 8.89387145, "unique_share": 0.007863422267}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "E", "kind": "region", "gene_start": 26245, "gene_end": 26472, "gene_length": 228, "n_seq": 1312173, "n_unique": 893, "n_unique_coding": 756668, "unique_per_seq": 0.0006805505067, "unique_per_nt": 3.916666667, "unique_share": 0.001180174132}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "nsp1", "kind": "nsp", "gene_start": 266, "gene_end": 805, "gene_length": 540, "n_seq": 1312173, "n_unique": 7070, "n_unique_coding": 756668, "unique_per_seq": 0.005388009051, "unique_per_nt": 13.09259259, "unique_share": 0.00934359587}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "nsp2", "kind": "nsp", "gene_start": 806, "gene_end": 2719, "gene_length": 1914, "n_seq": 1312173, "n_unique": 31457, "n_unique_coding": 756668, "unique_per_seq": 0.02397321085, "unique_per_nt": 16.43521421, "unique_share": 0.0415730545}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "nsp3", "kind": "nsp", "gene_start": 2720, "gene_end": 8554, "gene_length": 5835, "n_seq": 1312173, "n_unique": 128499, "n_unique_coding": 756668, "unique_per_seq": 0.09792839816, "unique_per_nt": 22.02210797, "unique_share": 0.1698221677}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "nsp4", "kind": "nsp", "gene_start": 8555, "gene_end": 10054, "gene_length": 1500, "n_seq": 1312173, "n_unique": 15280, "n_unique_coding": 756668, "unique_per_seq": 0.01164480598, "unique_per_nt": 10.18666667, "unique_share": 0.02019379702}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "nsp5", "kind": "nsp", "gene_start": 10055, "gene_end": 10972, "gene_length": 918, "n_seq": 1312173, "n_unique": 6553, "n_unique_coding": 756668, "unique_per_seq": 0.004994006126, "unique_per_nt": 7.138344227, "unique_share": 0.008660337162}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "nsp6", "kind": "nsp", "gene_start": 10973, "gene_end": 11842, "gene_length": 870, "n_seq": 1312173, "n_unique": 8632, "n_unique_coding": 756668, "unique_per_seq": 0.006578400866, "unique_per_nt": 9.92183908, "unique_share": 0.01140790941}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "nsp7", "kind": "nsp", "gene_start": 11843, "gene_end": 12091, "gene_length": 249, "n_seq": 1312173, "n_unique": 824, "n_unique_coding": 756668, "unique_per_seq": 0.000627965977, "unique_per_nt": 3.309236948, "unique_share": 0.001088984865}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "nsp8", "kind": "nsp", "gene_start": 12092, "gene_end": 12685, "gene_length": 594, "n_seq": 1312173, "n_unique": 1930, "n_unique_coding": 756668, "unique_per_seq": 0.00147084264, "unique_per_nt": 3.249158249, "unique_share": 0.002550656298}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "nsp9", "kind": "nsp", "gene_start": 12686, "gene_end": 13024, "gene_length": 339, "n_seq": 1312173, "n_unique": 1446, "n_unique_coding": 756668, "unique_per_seq": 0.001101988838, "unique_per_nt": 4.265486726, "unique_share": 0.001911009848}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "nsp10", "kind": "nsp", "gene_start": 13025, "gene_end": 13441, "gene_length": 417, "n_seq": 1312173, "n_unique": 1748, "n_unique_coding": 756668, "unique_per_seq": 0.001332141417, "unique_per_nt": 4.191846523, "unique_share": 0.002310128088}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "nsp11", "kind": "nsp", "gene_start": 13442, "gene_end": 13480, "gene_length": 39, "n_seq": 1312173, "n_unique": 75, "n_unique_coding": 756668, "unique_per_seq": 5.715709743e-05, "unique_per_nt": 1.923076923, "unique_share": 9.911876807e-05}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "nsp12", "kind": "nsp", "gene_start": 13442, "gene_end": 16236, "gene_length": 2795, "n_seq": 1312173, "n_unique": 32275, "n_unique_coding": 756668, "unique_per_seq": 0.02459660426, "unique_per_nt": 11.54740608, "unique_share": 0.04265410986}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "nsp13", "kind": "nsp", "gene_start": 16237, "gene_end": 18039, "gene_length": 1803, "n_seq": 1312173, "n_unique": 16579, "n_unique_coding": 756668, "unique_per_seq": 0.01263476691, "unique_per_nt": 9.195230172, "unique_share": 0.02191053408}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "nsp14", "kind": "nsp", "gene_start": 18040, "gene_end": 19620, "gene_length": 1581, "n_seq": 1312173, "n_unique": 15209, "n_unique_coding": 756668, "unique_per_seq": 0.01159069726, "unique_per_nt": 9.619860848, "unique_share": 0.02009996458}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "nsp15", "kind": "nsp", "gene_start": 19621, "gene_end": 20658, "gene_length": 1038, "n_seq": 1312173, "n_unique": 7267, "n_unique_coding": 756668, "unique_per_seq": 0.005538141693, "unique_per_nt": 7.000963391, "unique_share": 0.009603947834}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "nsp16", "kind": "nsp", "gene_start": 20659, "gene_end": 21552, "gene_length": 894, "n_seq": 1312173, "n_unique": 4418, "n_unique_coding": 756668, "unique_per_seq": 0.003366934086, "unique_per_nt": 4.941834452, "unique_share": 0.005838756231}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "Host modulation", "kind": "nsp_group", "gene_start": 266, "gene_end": 2719, "gene_length": 2454, "n_seq": 1312173, "n_unique": 56938, "n_unique_coding": 756668, "unique_per_seq": 0.04339214418, "unique_per_nt": 23.20211899, "unique_share": 0.07524832555}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "Proteases", "kind": "nsp_group", "gene_start": 2720, "gene_end": 10972, "gene_length": 6753, "n_seq": 1312173, "n_unique": 155461, "n_unique_coding": 756668, "unique_per_seq": 0.1184759936, "unique_per_nt": 23.02102769, "unique_share": 0.205454704}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "Membrane remodeling", "kind": "nsp_group", "gene_start": 8555, "gene_end": 11842, "gene_length": 2370, "n_seq": 1312173, "n_unique": 34646, "n_unique_coding": 756668, "unique_per_seq": 0.02640353063, "unique_per_nt": 14.6185654, "unique_share": 0.04578758452}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "Polymerase core", "kind": "nsp_group", "gene_start": 11843, "gene_end": 16236, "gene_length": 3638, "n_seq": 1312173, "n_unique": 47637, "n_unique_coding": 756668, "unique_per_seq": 0.036303902, "unique_per_nt": 13.09428257, "unique_share": 0.06295627673}, {"period": "Omicron BA.1", "period_start": "2021-11-26", "period_end": "2022-02-28", "gene": "RNA processing", "kind": "nsp_group", "gene_start": 12686, "gene_end": 21552, "gene_length": 6072, "n_seq": 1312173, "n_unique": 104601, "n_unique_coding": 756668, "unique_per_seq": 0.07971586064, "unique_per_nt": 17.22677866, "unique_share": 0.1382389635}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "ORF1ab", "kind": "region", "gene_start": 266, "gene_end": 21555, "gene_length": 21290, "n_seq": 906416, "n_unique": 331315, "n_unique_coding": 512638, "unique_per_seq": 0.365522012, "unique_per_nt": 15.56200094, "unique_share": 0.6462942661}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "S", "kind": "region", "gene_start": 21563, "gene_end": 25384, "gene_length": 3822, "n_seq": 906416, "n_unique": 63658, "n_unique_coding": 512638, "unique_per_seq": 0.07023044606, "unique_per_nt": 16.65567766, "unique_share": 0.1241772947}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "N", "kind": "region", "gene_start": 28274, "gene_end": 29533, "gene_length": 1260, "n_seq": 906416, "n_unique": 16507, "n_unique_coding": 512638, "unique_per_seq": 0.01821128488, "unique_per_nt": 13.10079365, "unique_share": 0.03220011002}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "M", "kind": "region", "gene_start": 26523, "gene_end": 27191, "gene_length": 669, "n_seq": 906416, "n_unique": 3351, "n_unique_coding": 512638, "unique_per_seq": 0.003696977988, "unique_per_nt": 5.00896861, "unique_share": 0.006536776439}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "E", "kind": "region", "gene_start": 26245, "gene_end": 26472, "gene_length": 228, "n_seq": 906416, "n_unique": 470, "n_unique_coding": 512638, "unique_per_seq": 0.00051852571, "unique_per_nt": 2.061403509, "unique_share": 0.0009168262985}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "nsp1", "kind": "nsp", "gene_start": 266, "gene_end": 805, "gene_length": 540, "n_seq": 906416, "n_unique": 5993, "n_unique_coding": 512638, "unique_per_seq": 0.006611754426, "unique_per_nt": 11.09814815, "unique_share": 0.01169051065}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "nsp2", "kind": "nsp", "gene_start": 806, "gene_end": 2719, "gene_length": 1914, "n_seq": 906416, "n_unique": 16745, "n_unique_coding": 512638, "unique_per_seq": 0.01847385748, "unique_per_nt": 8.748693835, "unique_share": 0.03266437525}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "nsp3", "kind": "nsp", "gene_start": 2720, "gene_end": 8554, "gene_length": 5835, "n_seq": 906416, "n_unique": 66894, "n_unique_coding": 512638, "unique_per_seq": 0.07380055074, "unique_per_nt": 11.46426735, "unique_share": 0.1304897413}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "nsp4", "kind": "nsp", "gene_start": 8555, "gene_end": 10054, "gene_length": 1500, "n_seq": 906416, "n_unique": 7839, "n_unique_coding": 512638, "unique_per_seq": 0.008648346896, "unique_per_nt": 5.226, "unique_share": 0.01529149224}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "nsp5", "kind": "nsp", "gene_start": 10055, "gene_end": 10972, "gene_length": 918, "n_seq": 906416, "n_unique": 3570, "n_unique_coding": 512638, "unique_per_seq": 0.003938588904, "unique_per_nt": 3.888888889, "unique_share": 0.00696397848}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "nsp6", "kind": "nsp", "gene_start": 10973, "gene_end": 11842, "gene_length": 870, "n_seq": 906416, "n_unique": 4305, "n_unique_coding": 512638, "unique_per_seq": 0.004749474855, "unique_per_nt": 4.948275862, "unique_share": 0.008397738755}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "nsp7", "kind": "nsp", "gene_start": 11843, "gene_end": 12091, "gene_length": 249, "n_seq": 906416, "n_unique": 469, "n_unique_coding": 512638, "unique_per_seq": 0.0005174224639, "unique_per_nt": 1.883534137, "unique_share": 0.0009148756042}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "nsp8", "kind": "nsp", "gene_start": 12092, "gene_end": 12685, "gene_length": 594, "n_seq": 906416, "n_unique": 1259, "n_unique_coding": 512638, "unique_per_seq": 0.001388986955, "unique_per_nt": 2.11952862, "unique_share": 0.002455924063}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "nsp9", "kind": "nsp", "gene_start": 12686, "gene_end": 13024, "gene_length": 339, "n_seq": 906416, "n_unique": 888, "n_unique_coding": 512638, "unique_per_seq": 0.0009796826181, "unique_per_nt": 2.619469027, "unique_share": 0.001732216496}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "nsp10", "kind": "nsp", "gene_start": 13025, "gene_end": 13441, "gene_length": 417, "n_seq": 906416, "n_unique": 1093, "n_unique_coding": 512638, "unique_per_seq": 0.001205848087, "unique_per_nt": 2.621103118, "unique_share": 0.002132108818}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "nsp11", "kind": "nsp", "gene_start": 13442, "gene_end": 13480, "gene_length": 39, "n_seq": 906416, "n_unique": 43, "n_unique_coding": 512638, "unique_per_seq": 4.743958624e-05, "unique_per_nt": 1.102564103, "unique_share": 8.387985284e-05}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "nsp12", "kind": "nsp", "gene_start": 13442, "gene_end": 16236, "gene_length": 2795, "n_seq": 906416, "n_unique": 13675, "n_unique_coding": 512638, "unique_per_seq": 0.01508689167, "unique_per_nt": 4.892665474, "unique_share": 0.0266757439}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "nsp13", "kind": "nsp", "gene_start": 16237, "gene_end": 18039, "gene_length": 1803, "n_seq": 906416, "n_unique": 8323, "n_unique_coding": 512638, "unique_per_seq": 0.009182318053, "unique_per_nt": 4.61619523, "unique_share": 0.01623562826}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "nsp14", "kind": "nsp", "gene_start": 18040, "gene_end": 19620, "gene_length": 1581, "n_seq": 906416, "n_unique": 6308, "n_unique_coding": 512638, "unique_per_seq": 0.006959276977, "unique_per_nt": 3.989879823, "unique_share": 0.01230497934}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "nsp15", "kind": "nsp", "gene_start": 19621, "gene_end": 20658, "gene_length": 1038, "n_seq": 906416, "n_unique": 3593, "n_unique_coding": 512638, "unique_per_seq": 0.003963963566, "unique_per_nt": 3.461464355, "unique_share": 0.007008844448}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "nsp16", "kind": "nsp", "gene_start": 20659, "gene_end": 21552, "gene_length": 894, "n_seq": 906416, "n_unique": 2027, "n_unique_coding": 512638, "unique_per_seq": 0.00223628003, "unique_per_nt": 2.267337808, "unique_share": 0.003954057249}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "Host modulation", "kind": "nsp_group", "gene_start": 266, "gene_end": 2719, "gene_length": 2454, "n_seq": 906416, "n_unique": 35855, "n_unique_coding": 512638, "unique_per_seq": 0.0395568922, "unique_per_nt": 14.61083945, "unique_share": 0.06994214241}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "Proteases", "kind": "nsp_group", "gene_start": 2720, "gene_end": 10972, "gene_length": 6753, "n_seq": 906416, "n_unique": 82729, "n_unique_coding": 512638, "unique_per_seq": 0.09127045418, "unique_per_nt": 12.25070339, "unique_share": 0.1613789848}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "Membrane remodeling", "kind": "nsp_group", "gene_start": 8555, "gene_end": 11842, "gene_length": 2370, "n_seq": 906416, "n_unique": 17717, "n_unique_coding": 512638, "unique_per_seq": 0.01954621278, "unique_per_nt": 7.475527426, "unique_share": 0.03456045006}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "Polymerase core", "kind": "nsp_group", "gene_start": 11843, "gene_end": 16236, "gene_length": 3638, "n_seq": 906416, "n_unique": 21424, "n_unique_coding": 512638, "unique_per_seq": 0.02363594641, "unique_per_nt": 5.888949973, "unique_share": 0.04179167366}, {"period": "Omicron BA.2", "period_start": "2022-03-01", "period_end": "2022-05-31", "gene": "RNA processing", "kind": "nsp_group", "gene_start": 12686, "gene_end": 21552, "gene_length": 6072, "n_seq": 906416, "n_unique": 50924, "n_unique_coding": 512638, "unique_per_seq": 0.05618170906, "unique_per_nt": 8.386693017, "unique_share": 0.09933715409}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "ORF1ab", "kind": "region", "gene_start": 266, "gene_end": 21555, "gene_length": 21290, "n_seq": 1519161, "n_unique": 663854, "n_unique_coding": 958359, "unique_per_seq": 0.4369872581, "unique_per_nt": 31.18149366, "unique_share": 0.6926986651}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "S", "kind": "region", "gene_start": 21563, "gene_end": 25384, "gene_length": 3822, "n_seq": 1519161, "n_unique": 150953, "n_unique_coding": 958359, "unique_per_seq": 0.09936603165, "unique_per_nt": 39.49581371, "unique_share": 0.1575119553}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "N", "kind": "region", "gene_start": 28274, "gene_end": 29533, "gene_length": 1260, "n_seq": 1519161, "n_unique": 40888, "n_unique_coding": 958359, "unique_per_seq": 0.02691485629, "unique_per_nt": 32.45079365, "unique_share": 0.04266459646}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "M", "kind": "region", "gene_start": 26523, "gene_end": 27191, "gene_length": 669, "n_seq": 1519161, "n_unique": 7661, "n_unique_coding": 958359, "unique_per_seq": 0.005042915135, "unique_per_nt": 11.45142003, "unique_share": 0.00799387286}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "E", "kind": "region", "gene_start": 26245, "gene_end": 26472, "gene_length": 228, "n_seq": 1519161, "n_unique": 902, "n_unique_coding": 958359, "unique_per_seq": 0.0005937487863, "unique_per_nt": 3.956140351, "unique_share": 0.0009411921837}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "nsp1", "kind": "nsp", "gene_start": 266, "gene_end": 805, "gene_length": 540, "n_seq": 1519161, "n_unique": 9925, "n_unique_coding": 958359, "unique_per_seq": 0.006533211424, "unique_per_nt": 18.37962963, "unique_share": 0.01035624437}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "nsp2", "kind": "nsp", "gene_start": 806, "gene_end": 2719, "gene_length": 1914, "n_seq": 1519161, "n_unique": 38924, "n_unique_coding": 958359, "unique_per_seq": 0.02562203743, "unique_per_nt": 20.33646813, "unique_share": 0.04061526004}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "nsp3", "kind": "nsp", "gene_start": 2720, "gene_end": 8554, "gene_length": 5835, "n_seq": 1519161, "n_unique": 150447, "n_unique_coding": 958359, "unique_per_seq": 0.09903295306, "unique_per_nt": 25.78354756, "unique_share": 0.1569839695}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "nsp4", "kind": "nsp", "gene_start": 8555, "gene_end": 10054, "gene_length": 1500, "n_seq": 1519161, "n_unique": 13447, "n_unique_coding": 958359, "unique_per_seq": 0.008851596375, "unique_per_nt": 8.964666667, "unique_share": 0.01403127638}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "nsp5", "kind": "nsp", "gene_start": 10055, "gene_end": 10972, "gene_length": 918, "n_seq": 1519161, "n_unique": 4899, "n_unique_coding": 958359, "unique_per_seq": 0.003224806324, "unique_per_nt": 5.336601307, "unique_share": 0.005111863091}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "nsp6", "kind": "nsp", "gene_start": 10973, "gene_end": 11842, "gene_length": 870, "n_seq": 1519161, "n_unique": 7821, "n_unique_coding": 958359, "unique_per_seq": 0.005148236428, "unique_per_nt": 8.989655172, "unique_share": 0.00816082491}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "nsp7", "kind": "nsp", "gene_start": 11843, "gene_end": 12091, "gene_length": 249, "n_seq": 1519161, "n_unique": 769, "n_unique_coding": 958359, "unique_per_seq": 0.000506200462, "unique_per_nt": 3.088353414, "unique_share": 0.0008024132919}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "nsp8", "kind": "nsp", "gene_start": 12092, "gene_end": 12685, "gene_length": 594, "n_seq": 1519161, "n_unique": 3209, "n_unique_coding": 958359, "unique_per_seq": 0.002112350172, "unique_per_nt": 5.402356902, "unique_share": 0.003348432059}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "nsp9", "kind": "nsp", "gene_start": 12686, "gene_end": 13024, "gene_length": 339, "n_seq": 1519161, "n_unique": 1095, "n_unique_coding": 958359, "unique_per_seq": 0.0007207925954, "unique_per_nt": 3.230088496, "unique_share": 0.001142578094}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "nsp10", "kind": "nsp", "gene_start": 13025, "gene_end": 13441, "gene_length": 417, "n_seq": 1519161, "n_unique": 1455, "n_unique_coding": 958359, "unique_per_seq": 0.0009577655035, "unique_per_nt": 3.489208633, "unique_share": 0.001518220208}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "nsp11", "kind": "nsp", "gene_start": 13442, "gene_end": 13480, "gene_length": 39, "n_seq": 1519161, "n_unique": 52, "n_unique_coding": 958359, "unique_per_seq": 3.422942005e-05, "unique_per_nt": 1.333333333, "unique_share": 5.425941636e-05}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "nsp12", "kind": "nsp", "gene_start": 13442, "gene_end": 16236, "gene_length": 2795, "n_seq": 1519161, "n_unique": 28900, "n_unique_coding": 958359, "unique_per_seq": 0.01902365845, "unique_per_nt": 10.33989267, "unique_share": 0.03015571409}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "nsp13", "kind": "nsp", "gene_start": 16237, "gene_end": 18039, "gene_length": 1803, "n_seq": 1519161, "n_unique": 21087, "n_unique_coding": 958359, "unique_per_seq": 0.01388068809, "unique_per_nt": 11.69550749, "unique_share": 0.02200323678}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "nsp14", "kind": "nsp", "gene_start": 18040, "gene_end": 19620, "gene_length": 1581, "n_seq": 1519161, "n_unique": 15071, "n_unique_coding": 958359, "unique_per_seq": 0.009920607493, "unique_per_nt": 9.53257432, "unique_share": 0.01572583969}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "nsp15", "kind": "nsp", "gene_start": 19621, "gene_end": 20658, "gene_length": 1038, "n_seq": 1519161, "n_unique": 5112, "n_unique_coding": 958359, "unique_per_seq": 0.003365015295, "unique_per_nt": 4.924855491, "unique_share": 0.005334118008}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "nsp16", "kind": "nsp", "gene_start": 20659, "gene_end": 21552, "gene_length": 894, "n_seq": 1519161, "n_unique": 3854, "n_unique_coding": 958359, "unique_per_seq": 0.002536926633, "unique_per_nt": 4.310961969, "unique_share": 0.004021457512}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "Host modulation", "kind": "nsp_group", "gene_start": 266, "gene_end": 2719, "gene_length": 2454, "n_seq": 1519161, "n_unique": 78767, "n_unique_coding": 958359, "unique_per_seq": 0.05184901403, "unique_per_nt": 32.09739201, "unique_share": 0.08218945093}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "Proteases", "kind": "nsp_group", "gene_start": 2720, "gene_end": 10972, "gene_length": 6753, "n_seq": 1519161, "n_unique": 180502, "n_unique_coding": 958359, "unique_per_seq": 0.1188168996, "unique_per_nt": 26.72915741, "unique_share": 0.1883448687}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "Membrane remodeling", "kind": "nsp_group", "gene_start": 8555, "gene_end": 11842, "gene_length": 2370, "n_seq": 1519161, "n_unique": 35155, "n_unique_coding": 958359, "unique_per_seq": 0.02314106273, "unique_per_nt": 14.83333333, "unique_share": 0.03668249581}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "Polymerase core", "kind": "nsp_group", "gene_start": 11843, "gene_end": 16236, "gene_length": 3638, "n_seq": 1519161, "n_unique": 50491, "n_unique_coding": 958359, "unique_per_seq": 0.03323610862, "unique_per_nt": 13.87877955, "unique_share": 0.05268484983}, {"period": "Omicron BA.5", "period_start": "2022-06-01", "period_end": "2022-12-31", "gene": "RNA processing", "kind": "nsp_group", "gene_start": 12686, "gene_end": 21552, "gene_length": 6072, "n_seq": 1519161, "n_unique": 127037, "n_unique_coding": 958359, "unique_per_seq": 0.08362313145, "unique_per_nt": 20.92177207, "unique_share": 0.1325567976}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "ORF1ab", "kind": "region", "gene_start": 266, "gene_end": 21555, "gene_length": 21290, "n_seq": 709472, "n_unique": 413428, "n_unique_coding": 527042, "unique_per_seq": 0.5827263091, "unique_per_nt": 19.4188821, "unique_share": 0.7844308423}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "S", "kind": "region", "gene_start": 21563, "gene_end": 25384, "gene_length": 3822, "n_seq": 709472, "n_unique": 146493, "n_unique_coding": 527042, "unique_per_seq": 0.2064817216, "unique_per_nt": 38.3288854, "unique_share": 0.2779531802}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "N", "kind": "region", "gene_start": 28274, "gene_end": 29533, "gene_length": 1260, "n_seq": 709472, "n_unique": 33120, "n_unique_coding": 527042, "unique_per_seq": 0.0466826034, "unique_per_nt": 26.28571429, "unique_share": 0.06284129159}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "M", "kind": "region", "gene_start": 26523, "gene_end": 27191, "gene_length": 669, "n_seq": 709472, "n_unique": 6106, "n_unique_coding": 527042, "unique_per_seq": 0.008606400253, "unique_per_nt": 9.127055306, "unique_share": 0.01158541445}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "E", "kind": "region", "gene_start": 26245, "gene_end": 26472, "gene_length": 228, "n_seq": 709472, "n_unique": 927, "n_unique_coding": 527042, "unique_per_seq": 0.001306605476, "unique_per_nt": 4.065789474, "unique_share": 0.001758873107}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "nsp1", "kind": "nsp", "gene_start": 266, "gene_end": 805, "gene_length": 540, "n_seq": 709472, "n_unique": 9236, "n_unique_coding": 527042, "unique_per_seq": 0.01301813179, "unique_per_nt": 17.1037037, "unique_share": 0.01752422008}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "nsp2", "kind": "nsp", "gene_start": 806, "gene_end": 2719, "gene_length": 1914, "n_seq": 709472, "n_unique": 41627, "n_unique_coding": 527042, "unique_per_seq": 0.0586732105, "unique_per_nt": 21.74869383, "unique_share": 0.07898232019}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "nsp3", "kind": "nsp", "gene_start": 2720, "gene_end": 8554, "gene_length": 5835, "n_seq": 709472, "n_unique": 134283, "n_unique_coding": 527042, "unique_per_seq": 0.1892717401, "unique_per_nt": 23.01336761, "unique_share": 0.2547861461}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "nsp4", "kind": "nsp", "gene_start": 8555, "gene_end": 10054, "gene_length": 1500, "n_seq": 709472, "n_unique": 15391, "n_unique_coding": 527042, "unique_per_seq": 0.02169359749, "unique_per_nt": 10.26066667, "unique_share": 0.02920260624}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "nsp5", "kind": "nsp", "gene_start": 10055, "gene_end": 10972, "gene_length": 918, "n_seq": 709472, "n_unique": 5165, "n_unique_coding": 527042, "unique_per_seq": 0.007280061792, "unique_per_nt": 5.626361656, "unique_share": 0.00979997799}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "nsp6", "kind": "nsp", "gene_start": 10973, "gene_end": 11842, "gene_length": 870, "n_seq": 709472, "n_unique": 7516, "n_unique_coding": 527042, "unique_per_seq": 0.01059379369, "unique_per_nt": 8.63908046, "unique_share": 0.01426072305}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "nsp7", "kind": "nsp", "gene_start": 11843, "gene_end": 12091, "gene_length": 249, "n_seq": 709472, "n_unique": 876, "n_unique_coding": 527042, "unique_per_seq": 0.001234721032, "unique_per_nt": 3.518072289, "unique_share": 0.001662106625}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "nsp8", "kind": "nsp", "gene_start": 12092, "gene_end": 12685, "gene_length": 594, "n_seq": 709472, "n_unique": 3441, "n_unique_coding": 527042, "unique_per_seq": 0.004850085698, "unique_per_nt": 5.792929293, "unique_share": 0.006528891436}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "nsp9", "kind": "nsp", "gene_start": 12686, "gene_end": 13024, "gene_length": 339, "n_seq": 709472, "n_unique": 1923, "n_unique_coding": 527042, "unique_per_seq": 0.002710466375, "unique_per_nt": 5.672566372, "unique_share": 0.003648665571}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "nsp10", "kind": "nsp", "gene_start": 13025, "gene_end": 13441, "gene_length": 417, "n_seq": 709472, "n_unique": 1533, "n_unique_coding": 527042, "unique_per_seq": 0.002160761806, "unique_per_nt": 3.676258993, "unique_share": 0.002908686594}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "nsp11", "kind": "nsp", "gene_start": 13442, "gene_end": 13480, "gene_length": 39, "n_seq": 709472, "n_unique": 60, "n_unique_coding": 527042, "unique_per_seq": 8.45699337e-05, "unique_per_nt": 1.538461538, "unique_share": 0.0001138429195}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "nsp12", "kind": "nsp", "gene_start": 13442, "gene_end": 16236, "gene_length": 2795, "n_seq": 709472, "n_unique": 30998, "n_unique_coding": 527042, "unique_per_seq": 0.04369164675, "unique_per_nt": 11.09051878, "unique_share": 0.058815047}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "nsp13", "kind": "nsp", "gene_start": 16237, "gene_end": 18039, "gene_length": 1803, "n_seq": 709472, "n_unique": 18881, "n_unique_coding": 527042, "unique_per_seq": 0.02661274864, "unique_per_nt": 10.47199113, "unique_share": 0.0358244694}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "nsp14", "kind": "nsp", "gene_start": 18040, "gene_end": 19620, "gene_length": 1581, "n_seq": 709472, "n_unique": 18788, "n_unique_coding": 527042, "unique_per_seq": 0.02648166524, "unique_per_nt": 11.88361796, "unique_share": 0.03564801287}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "nsp15", "kind": "nsp", "gene_start": 19621, "gene_end": 20658, "gene_length": 1038, "n_seq": 709472, "n_unique": 6028, "n_unique_coding": 527042, "unique_per_seq": 0.008496459339, "unique_per_nt": 5.807321773, "unique_share": 0.01143741865}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "nsp16", "kind": "nsp", "gene_start": 20659, "gene_end": 21552, "gene_length": 894, "n_seq": 709472, "n_unique": 3657, "n_unique_coding": 527042, "unique_per_seq": 0.005154537459, "unique_per_nt": 4.090604027, "unique_share": 0.006938725946}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "Host modulation", "kind": "nsp_group", "gene_start": 266, "gene_end": 2719, "gene_length": 2454, "n_seq": 709472, "n_unique": 74617, "n_unique_coding": 527042, "unique_per_seq": 0.105172579, "unique_per_nt": 30.40627547, "unique_share": 0.1415769521}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "Proteases", "kind": "nsp_group", "gene_start": 2720, "gene_end": 10972, "gene_length": 6753, "n_seq": 709472, "n_unique": 158203, "n_unique_coding": 527042, "unique_per_seq": 0.2229869537, "unique_per_nt": 23.42706945, "unique_share": 0.3001715233}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "Membrane remodeling", "kind": "nsp_group", "gene_start": 8555, "gene_end": 11842, "gene_length": 2370, "n_seq": 709472, "n_unique": 36800, "n_unique_coding": 527042, "unique_per_seq": 0.05186955933, "unique_per_nt": 15.52742616, "unique_share": 0.06982365732}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "Polymerase core", "kind": "nsp_group", "gene_start": 11843, "gene_end": 16236, "gene_length": 3638, "n_seq": 709472, "n_unique": 49770, "n_unique_coding": 527042, "unique_per_seq": 0.07015076, "unique_per_nt": 13.68059373, "unique_share": 0.09443270176}, {"period": "XBB", "period_start": "2023-01-01", "period_end": "2023-12-31", "gene": "RNA processing", "kind": "nsp_group", "gene_start": 12686, "gene_end": 21552, "gene_length": 6072, "n_seq": 709472, "n_unique": 113515, "n_unique_coding": 527042, "unique_per_seq": 0.1599992671, "unique_per_nt": 18.69482872, "unique_share": 0.2153813169}], "periods": ["pre-Delta", "Delta", "Omicron BA.1", "Omicron BA.2", "Omicron BA.5", "XBB"], "genes": ["ORF1ab", "S", "N", "M", "E", "nsp1", "nsp2", "nsp3", "nsp4", "nsp5", "nsp6", "nsp7", "nsp8", "nsp9", "nsp10", "nsp11", "nsp12", "nsp13", "nsp14", "nsp15", "nsp16", "Host modulation", "Proteases", "Membrane remodeling", "Polymerase core", "RNA processing"], "region_names": ["ORF1ab", "S", "N", "M", "E"], "nsp_names": ["nsp1", "nsp2", "nsp3", "nsp4", "nsp5", "nsp6", "nsp7", "nsp8", "nsp9", "nsp10", "nsp11", "nsp12", "nsp13", "nsp14", "nsp15", "nsp16"], "nsp_group_names": ["Host modulation", "Proteases", "Membrane remodeling", "Polymerase core", "RNA processing"], "period_seq": [{"period": "pre-Delta", "start": "2019-12-23", "end": "2021-04-30", "n_seq": 1321468, "n_unique_coding": 692154}, {"period": "Delta", "start": "2021-05-01", "end": "2021-11-25", "n_seq": 2173577, "n_unique_coding": 1227660}, {"period": "Omicron BA.1", "start": "2021-11-26", "end": "2022-02-28", "n_seq": 1312173, "n_unique_coding": 756668}, {"period": "Omicron BA.2", "start": "2022-03-01", "end": "2022-05-31", "n_seq": 906416, "n_unique_coding": 512638}, {"period": "Omicron BA.5", "start": "2022-06-01", "end": "2022-12-31", "n_seq": 1519161, "n_unique_coding": 958359}, {"period": "XBB", "start": "2023-01-01", "end": "2023-12-31", "n_seq": 709472, "n_unique_coding": 527042}], "run": {"total_sequences": "8308547", "assigned_sequences": "7942267", "skipped_outside_periods": "336036", "skipped_high_total_diff": "30244", "include_insertions": "1", "max_total_diff": "200", "period_count": "6", "gene_count": "26"}};
+    const regionVisibility = {};
+    const nspVisibility = {};
+    const nspGroupVisibility = {};
+    let lastCheckSignature = "";
+
+    const $ = (id) => document.getElementById(id);
+
+    function formatNumber(value) {
+      const number = Number(value || 0);
+      if (!Number.isFinite(number)) return "0";
+      if (Math.abs(number) >= 1000) return Math.round(number).toLocaleString("en-US");
+      if (Math.abs(number) >= 1) return number.toFixed(3);
+      if (number === 0) return "0";
+      return number.toPrecision(3);
+    }
+
+    function periodColor(index) {
+      return PERIOD_COLORS[index % PERIOD_COLORS.length];
+    }
+
+    function geneColor(name) {
+      return GENE_COLORS[name] || NSP_COLORS[name] || NSP_GROUP_COLORS[name] || "#334155";
+    }
+
+    function currentNspNames() {
+      return (payload.nsp_names && payload.nsp_names.length) ? payload.nsp_names : BUILTIN_NSP;
+    }
+
+    function currentNspGroupNames() {
+      return (payload.nsp_group_names && payload.nsp_group_names.length)
+        ? payload.nsp_group_names
+        : BUILTIN_GROUPS;
+    }
+
+    function hasNspData() {
+      return !!(payload.nsp_names && payload.nsp_names.length);
+    }
+
+    function ensureVisibilityDefaults() {
+      (payload.region_names || []).forEach((name) => {
+        if (regionVisibility[name] === undefined) regionVisibility[name] = true;
+      });
+      currentNspNames().forEach((name) => {
+        if (nspVisibility[name] === undefined) nspVisibility[name] = true;
+      });
+      currentNspGroupNames().forEach((name) => {
+        if (nspGroupVisibility[name] === undefined) nspGroupVisibility[name] = true;
+      });
+    }
+
+    function visibleGenes() {
+      const names = (payload.region_names || []).filter((name) => regionVisibility[name] !== false);
+      if ($("show-orf1ab-proteins").checked) {
+        if ($("group-nsp-lines").checked) {
+          names.push(...currentNspGroupNames().filter((name) => nspGroupVisibility[name] !== false));
+        } else {
+          names.push(...currentNspNames().filter((name) => nspVisibility[name] !== false));
+        }
+      }
+      return names;
+    }
+
+    function bindCheck(container, name, map, redrawOnly) {
+      const label = document.createElement("label");
+      label.className = "check-row";
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = map[name] !== false;
+      box.addEventListener("change", (event) => {
+        event.stopPropagation();
+        map[name] = box.checked;
+        if (redrawOnly) render(false);
+        else render(true);
+      });
+      const swatch = document.createElement("span");
+      swatch.className = "swatch";
+      swatch.style.background = geneColor(name);
+      label.appendChild(box);
+      label.appendChild(swatch);
+      label.appendChild(document.createTextNode(name));
+      container.appendChild(label);
+    }
+
+    function renderChecks() {
+      ensureVisibilityDefaults();
+      const showProteins = $("show-orf1ab-proteins").checked;
+      const grouped = $("group-nsp-lines").checked;
+      const signature = [
+        payload.source_path || "",
+        (payload.region_names || []).join(","),
+        currentNspNames().join(","),
+        currentNspGroupNames().join(","),
+        showProteins ? "1" : "0",
+        grouped ? "1" : "0",
+      ].join("|");
+      if (signature === lastCheckSignature) return;
+      lastCheckSignature = signature;
+
+      const regionBox = $("region-checks");
+      regionBox.innerHTML = "";
+      (payload.region_names || []).forEach((name) => bindCheck(regionBox, name, regionVisibility, true));
+
+      const nspBox = $("nsp-checks");
+      nspBox.innerHTML = "";
+      nspBox.style.display = showProteins ? "" : "none";
+      if (!showProteins) return;
+      if (grouped) {
+        currentNspGroupNames().forEach((name) => bindCheck(nspBox, name, nspGroupVisibility, true));
+      } else {
+        currentNspNames().forEach((name) => bindCheck(nspBox, name, nspVisibility, true));
+      }
+    }
+
+    function currentMetric() {
+      return $("metric").value || "unique_per_nt";
+    }
+
+    function metricLabel(key) {
+      const match = METRICS.find((item) => item[0] === key);
+      return match ? match[1] : key;
+    }
+
+    function drawGroupedBars(canvas, groups, seriesNames, seriesColors, valueLookup, yLabel) {
+      const ctx = canvas.getContext("2d");
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+      if (!groups.length || !seriesNames.length) {
+        ctx.fillStyle = "#64748b";
+        ctx.font = "16px Georgia";
+        ctx.fillText("No data loaded.", 24, 36);
+        return;
+      }
+
+      const left = 72;
+      const right = 18;
+      const top = 18;
+      const rotateLabels = groups.length > 8;
+      const bottom = rotateLabels ? 96 : 58;
+      const plotW = width - left - right;
+      const plotH = height - top - bottom;
+      let yMax = 0;
+      for (const group of groups) {
+        for (const series of seriesNames) {
+          yMax = Math.max(yMax, Number(valueLookup(group, series) || 0));
+        }
+      }
+      if (yMax <= 0) yMax = 1;
+      const groupWidth = plotW / groups.length;
+      const inner = groupWidth * 0.78;
+      const barW = inner / seriesNames.length;
+
+      ctx.strokeStyle = "#e5e7eb";
+      ctx.fillStyle = "#334155";
+      ctx.font = "12px Georgia";
+      for (let i = 0; i <= 5; i++) {
+        const t = i / 5;
+        const y = top + plotH - t * plotH;
+        ctx.beginPath();
+        ctx.moveTo(left, y);
+        ctx.lineTo(left + plotW, y);
+        ctx.stroke();
+        ctx.fillText(formatNumber(t * yMax), 8, y + 4);
+      }
+
+      groups.forEach((group, gi) => {
+        const gx = left + gi * groupWidth + (groupWidth - inner) / 2;
+        seriesNames.forEach((series, si) => {
+          const value = Number(valueLookup(group, series) || 0);
+          const barH = (value / yMax) * plotH;
+          const x = gx + si * barW;
+          const y = top + plotH - barH;
+          ctx.fillStyle = seriesColors[si];
+          ctx.fillRect(x, y, Math.max(1, barW - 2), barH);
+        });
+        ctx.fillStyle = "#334155";
+        ctx.font = groups.length > 12 ? "10px Georgia" : "12px Georgia";
+        if (rotateLabels) {
+          ctx.save();
+          ctx.translate(gx + inner / 2, height - 12);
+          ctx.rotate(-Math.PI / 3.4);
+          ctx.textAlign = "right";
+          ctx.fillText(String(group), 0, 0);
+          ctx.restore();
+        } else {
+          ctx.textAlign = "center";
+          ctx.fillText(String(group), gx + inner / 2, height - 28);
+          ctx.textAlign = "start";
+        }
+      });
+
+      ctx.save();
+      ctx.fillStyle = "#334155";
+      ctx.font = "12px Georgia";
+      ctx.translate(16, top + plotH / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(yLabel, 0, 0);
+      ctx.restore();
+    }
+
+    function rowMap() {
+      const map = new Map();
+      for (const row of (payload.rows || [])) {
+        map.set(row.period + "\t" + row.gene, row);
+      }
+      return map;
+    }
+
+    function render(rebuildChecks) {
+      if (rebuildChecks) lastCheckSignature = "";
+      $("status").textContent = payload.status || "";
+      renderChecks();
+      const metric = currentMetric();
+      const groupBy = $("group-by").value || "gene";
+      const periods = payload.periods || [];
+      const genes = visibleGenes();
+      const map = rowMap();
+      const lookup = (period, gene) => {
+        const row = map.get(period + "\t" + gene);
+        return row ? Number(row[metric] || 0) : 0;
+      };
+
+      const legend = $("legend");
+      legend.innerHTML = "";
+      const seriesNames = groupBy === "gene" ? periods : genes;
+      const seriesColors = seriesNames.map((name, idx) =>
+        groupBy === "gene" ? periodColor(idx) : geneColor(name)
+      );
+      seriesNames.forEach((name, idx) => {
+        const item = document.createElement("div");
+        item.innerHTML = `<span class="swatch" style="background:${seriesColors[idx]};"></span>${name}`;
+        legend.appendChild(item);
+      });
+
+      if (groupBy === "gene") {
+        drawGroupedBars(
+          $("main-chart"),
+          genes,
+          periods,
+          seriesColors,
+          (gene, period) => lookup(period, gene),
+          metricLabel(metric)
+        );
+      } else {
+        drawGroupedBars(
+          $("main-chart"),
+          periods,
+          genes,
+          seriesColors,
+          (period, gene) => lookup(period, gene),
+          metricLabel(metric)
+        );
+      }
+
+      const seqLookup = Object.fromEntries(
+        (payload.period_seq || []).map((item) => [item.period, item.n_seq])
+      );
+      drawGroupedBars(
+        $("seq-chart"),
+        periods,
+        ["n_seq"],
+        ["rgba(15, 23, 42, 0.45)"],
+        (period) => Number(seqLookup[period] || 0),
+        "n_seq"
+      );
+
+      const notes = {
+        unique_per_nt: "Best for comparing genes inside one period: longer ORFs do not win by length.",
+        unique_share: "Best for comparing periods: gene unique count divided by unique full-coding states.",
+        unique_per_seq: "Fair inside one period. Across periods it falls when GISAID sampling is dense.",
+        n_unique: "Raw unique gene-state count. Tracks both diversity and sample size.",
+      };
+      $("main-hint").textContent = (notes[metric] || "") +
+        ($("show-orf1ab-proteins").checked
+          ? (hasNspData()
+            ? " Individual NSP bars appear when Group NSP lines is off. nsp11 overlaps the start of nsp12."
+            : " This TSV has no nsp rows. Re-run ScateClave with the updated GeneUniqueVariantTracker.")
+          : " Enable Show ORF1ab proteins to plot nsp1-nsp16 as separate bars.");
+
+      const visible = new Set(genes);
+      const body = $("table-body");
+      body.innerHTML = "";
+      for (const row of (payload.rows || [])) {
+        if (!visible.has(row.gene)) continue;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${row.period}<div class="status">${row.period_start} to ${row.period_end}</div></td>
+          <td>${row.gene}</td>
+          <td class="num">${Number(row.n_seq || 0).toLocaleString("en-US")}</td>
+          <td class="num">${Number(row.n_unique || 0).toLocaleString("en-US")}</td>
+          <td class="num">${formatNumber(row.unique_per_seq)}</td>
+          <td class="num">${formatNumber(row.unique_per_nt)}</td>
+          <td class="num">${formatNumber(row.unique_share)}</td>`;
+        body.appendChild(tr);
+      }
+    }
+
+    function fillMetricSelect() {
+      const select = $("metric");
+      select.innerHTML = METRICS.map((item) => `<option value="${item[0]}">${item[1]}</option>`).join("");
+      select.value = "unique_per_nt";
+    }
+
+    async function openFile() {
+      try {
+        if (!window.pywebview || !window.pywebview.api) {
+          alert("Viewer bridge is not ready yet. Try again in a second.");
+          return;
+        }
+        const chosen = await window.pywebview.api.choose_file();
+        if (!chosen || chosen.cancelled) return;
+        if (!chosen.ok) {
+          alert(chosen.error || "Could not open the file dialog.");
+          return;
+        }
+        const loaded = await window.pywebview.api.load_file(chosen.path);
+        if (loaded && loaded.payload) {
+          payload = loaded.payload;
+          lastCheckSignature = "";
+          render(true);
+        } else {
+          alert((loaded && loaded.status) ? loaded.status : "Failed to load TSV.");
+        }
+      } catch (error) {
+        alert("Failed to open file: " + error);
+      }
+    }
+
+    fillMetricSelect();
+    if (STATIC_MODE) {
+      $("open-btn").style.display = "none";
+      $("hub-link").hidden = false;
+    } else {
+      $("open-btn").addEventListener("click", openFile);
+    }
+    $("metric").addEventListener("change", () => render(false));
+    $("group-by").addEventListener("change", () => render(false));
+    $("show-orf1ab-proteins").addEventListener("change", () => render(true));
+    $("group-nsp-lines").addEventListener("change", () => render(true));
+    $("nsp-show-all").addEventListener("click", () => {
+      const grouped = $("group-nsp-lines").checked;
+      const names = grouped ? currentNspGroupNames() : currentNspNames();
+      const map = grouped ? nspGroupVisibility : nspVisibility;
+      names.forEach((name) => { map[name] = true; });
+      lastCheckSignature = "";
+      render(true);
+    });
+    $("nsp-hide-all").addEventListener("click", () => {
+      const grouped = $("group-nsp-lines").checked;
+      const names = grouped ? currentNspGroupNames() : currentNspNames();
+      const map = grouped ? nspGroupVisibility : nspVisibility;
+      names.forEach((name) => { map[name] = false; });
+      lastCheckSignature = "";
+      render(true);
+    });
+    render(true);
+  </script>
+</body>
+</html>

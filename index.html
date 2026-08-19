@@ -135,11 +135,11 @@
   <div class="app">
     <section class="hero">
       <h1>CodonRain Publication Reports</h1>
-      <p>This report hub brings together interactive static pages generated from the current SARS-CoV-2 analysis outputs. The dynamics reports show both reference-based and pairwise mutation signals over time, the clustering report groups identical coding-region states and their nearest earlier relatives, and the landscape reports show how sequence density is distributed by time bucket and distance to the reference at different temporal resolutions.</p>
+      <p>This report hub brings together interactive static pages generated from the current SARS-CoV-2 analysis outputs. The dynamics reports show both reference-based and pairwise mutation signals over time, the clustering report groups identical coding-region states and their nearest earlier relatives, unique gene states count distinct mutation profiles of each ORF in VOC-aligned calendar periods, and the landscape reports show how sequence density is distributed by time bucket and distance to the reference at different temporal resolutions.</p>
       <div class="sub">
         <div class="pill">Static publication site</div>
         <div class="pill">Interactive reports</div>
-        <div class="pill">Landscape + dynamics + clustering</div>
+        <div class="pill">Landscape + dynamics + clustering + unique gene states</div>
       </div>
     </section>
 
@@ -184,6 +184,20 @@
           <ul class="bullets"><li>Cluster count by cluster size on double-logarithmic axes</li><li>Rotatable 3D view of cluster size, lifespan and cluster count</li><li>Time interval and edit distance to the nearest predecessor</li></ul>
           <div class="tags"><span class="tag">identical states</span><span class="tag">lifespan</span><span class="tag">predecessor</span><span class="tag">3D</span><span class="tag">interactive</span></div>
           <div class="actions"><a href="clusters.html">Open Report</a></div>
+        </div>
+      </article>
+<article class="card">
+        <div class="preview">
+          <img src="previews/gene_unique_variants.svg" alt="Unique gene states by period preview" />
+        </div>
+        <div class="body">
+          <div class="eyebrow">Gene richness</div>
+          <h2>Unique Gene States by Period</h2>
+          <div class="desc">For each gene in each VOC-aligned calendar period, the report counts distinct nucleotide mutation profiles, then normalizes by sequence count, gene length, and unique full-coding genome states.</div>
+          <div class="stats"><div class="stat"><div class="k">Sequences</div><div class="v">7,942,267</div></div><div class="stat"><div class="k">Periods</div><div class="v">6</div></div><div class="stat"><div class="k">Genes</div><div class="v">26</div></div></div>
+          <ul class="bullets"><li>Grouped bars for ORF1ab, S, N, M, E across pre-Delta through XBB</li><li>Per-sequence, per-nucleotide, and share of unique coding states</li><li>Optional nsp1–nsp16 bars or functional NSP groups</li></ul>
+          <div class="tags"><span class="tag">unique states</span><span class="tag">VOC periods</span><span class="tag">per nt</span><span class="tag">share</span><span class="tag">NSP</span></div>
+          <div class="actions"><a href="gene_unique_variants.html">Open Report</a></div>
         </div>
       </article>
 <article class="card">
